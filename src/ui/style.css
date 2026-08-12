@@ -1,0 +1,370 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  /* --- 背景與玻璃基底 (Apple Spatial-style Charcoal & Slate) --- */
+  --bg-deep-space: rgba(20, 21, 26, 0.85);
+  /* 沉浸式暗色背景遮罩 */
+  --glass-surface: rgba(255, 255, 255, 0.07);
+  /* 主玻璃面板背景 */
+  --glass-surface-hover: rgba(255, 255, 255, 0.14);
+  /* 滑過/懸停高亮 */
+  --glass-border: rgba(255, 255, 255, 0.16);
+  /* 半透明微光邊框 */
+  --glass-border-light: rgba(255, 255, 255, 0.32);
+  /* 聚焦邊框高光 */
+
+  /* --- 技能與狀態主題色 (Accent Colors) --- */
+  --cyan-spatial: #00F2FE;
+  /* 預設空間主色 / 手勢游標 / UI選取 */
+  --violet-spell: #9D4EDD;
+  /* 法術技能 / 結印/ 魔法環 */
+  --blade-cyan: #4CC9F0;
+  /* 太刀 / 近戰姿態 / 居合計量 */
+  --amber-warning: #FFB703;
+  /* 槍械換彈 (Reload) / 警戒 / 倒數 */
+  --emerald-success: #06D6A0;
+  /* 動作定位成功 / 驗證通過 */
+
+  /* --- 文字與陰影 --- */
+  --text-main: #FFFFFF;
+  /* 主文字 */
+  --text-muted: rgba(255, 255, 255, 0.65);
+  /* 次要/說明文字 */
+  --drop-shadow-vr: 0 16px 40px rgba(0, 0, 0, 0.45);
+  /* 空間懸浮深陰影 */
+  --glow-cyan: 0 0 20px rgba(0, 242, 254, 0.3);
+  /* 空間發光特效 */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: #e5e5e7;
+  /* Apple-style premium matte titanium slate grey */
+  color: var(--text-main);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* Background animated cyber-grid */
+body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(0, 242, 254, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 242, 254, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center;
+  z-index: 1;
+  pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.025) 0%, transparent 60%);
+  z-index: 0;
+  pointer-events: none;
+  animation: rotateBg 40s linear infinite;
+}
+
+@keyframes rotateBg {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.dashboard.hidden {
+  display: none !important;
+}
+
+/* VR Spatial Glass Panel */
+.dashboard {
+  position: relative;
+  z-index: 10;
+  width: 90%;
+  max-width: 900px;
+  background: var(--glass-surface);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: var(--drop-shadow-vr);
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.dashboard:hover {
+  border-color: var(--glass-border-light);
+  box-shadow: var(--drop-shadow-vr), var(--glow-cyan);
+}
+
+header {
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 20px;
+}
+
+header h1 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(45deg, var(--cyan-spatial), var(--violet-spell), var(--blade-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+}
+
+header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: 5px;
+  letter-spacing: 1px;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.section-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-left: 3px solid var(--cyan-spatial);
+  padding-left: 10px;
+}
+
+/* State Status panel */
+.status-panel {
+  background: rgba(28, 29, 36, 0.65);
+  border-radius: 16px;
+  padding: 25px;
+  border: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  text-align: center;
+}
+
+.status-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.state-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.8rem;
+  font-weight: bold;
+  padding: 8px 24px;
+  border-radius: 8px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.state-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: all 0.5s;
+}
+
+.state-badge:hover::before {
+  left: 150%;
+}
+
+.state-menu {
+  color: var(--cyan-spatial);
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
+}
+
+.state-test_mode {
+  color: var(--amber-warning);
+  background: rgba(255, 183, 3, 0.1);
+  border: 1px solid rgba(255, 183, 3, 0.3);
+  box-shadow: 0 0 10px rgba(255, 183, 3, 0.15);
+}
+
+.state-playing {
+  color: var(--emerald-success);
+  background: rgba(6, 214, 160, 0.1);
+  border: 1px solid rgba(6, 214, 160, 0.3);
+  box-shadow: 0 0 15px rgba(6, 214, 160, 0.2);
+}
+
+.state-paused {
+  color: #e63946;
+  background: rgba(230, 57, 70, 0.1);
+  border: 1px solid rgba(230, 57, 70, 0.3);
+  box-shadow: 0 0 10px rgba(230, 57, 70, 0.15);
+}
+
+/* Control buttons list - Spatial VR Button style */
+.control-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--text-main);
+  font-family: 'Rajdhani', 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  padding: 14px 20px;
+  cursor: pointer;
+  outline: none;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.control-btn:hover {
+  background: var(--glass-surface-hover);
+  border-color: var(--cyan-spatial);
+  transform: translateZ(10px) scale(1.03);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+  color: var(--text-main);
+}
+
+.control-btn:active {
+  transform: translateZ(2px) scale(0.97);
+  background: rgba(0, 242, 254, 0.25);
+  border-color: var(--cyan-spatial);
+}
+
+.control-btn.active {
+  background: rgba(0, 242, 254, 0.25);
+  border-color: var(--cyan-spatial);
+  color: var(--cyan-spatial);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+}
+
+.control-btn.active:hover {
+  transform: translateZ(10px) scale(1.03);
+}
+
+/* Stage Info Timeline */
+.stage-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.stage-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  position: relative;
+}
+
+.stage-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 36px;
+  bottom: -15px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stage-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.stage-item.current .stage-dot {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--cyan-spatial);
+  color: var(--cyan-spatial);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
+.stage-detail {
+  padding-top: 6px;
+}
+
+.stage-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.stage-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.footer-credits {
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.2);
+  margin-top: 10px;
+}
