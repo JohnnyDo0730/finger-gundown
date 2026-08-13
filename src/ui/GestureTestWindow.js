@@ -64,10 +64,22 @@ export class GestureTestWindow {
     this.camBrightness = parseInt(localStorage.getItem('gesture_cam_brightness') || '100', 10);
     this.camContrast  = parseInt(localStorage.getItem('gesture_cam_contrast')  || '110', 10);
 
+    // Calibration step tracking
+    this.calibrationStep = 0;
+    this.calibPoints = [];
+    this.lastIsPinching = false;
+    this.calibClickCooldown = false;
+
     this.createDOM();
     this.setupStyles();
     this.bindEvents();
     this.updateModeVisibility();
+
+    // Start background MediaPipe tracking immediately if enabled in localStorage
+    const isEnabled = localStorage.getItem('gesture_control_enabled') === 'true';
+    if (isEnabled) {
+      this.initMediaPipe();
+    }
   }
 
   /**
@@ -174,12 +186,13 @@ export class GestureTestWindow {
     this.overlayEl.innerHTML = `
       <!-- Block 3: Top Center Header (Tab Switches) -->
       <div id="floating-panel-top" class="floating-panel top-panel">
-        <div class="panel-header-compact">類別測試選擇</div>
+        <div class="panel-header-compact">操作測試與手勢教學</div>
         <div class="tabs-list">
-          <button class="mode-tab-btn active" data-mode="basic">測試基礎手勢</button>
-          <button class="mode-tab-btn" data-mode="ranged">測試槍械手勢</button>
-          <button class="mode-tab-btn" data-mode="melee">測試技能手勢</button>
-          <button class="mode-tab-btn dev-tab" data-mode="record">手勢錄入 (開發者)</button>
+          <button class="mode-tab-btn active" data-mode="basic">測試<br>基礎手勢</button>
+          <button class="mode-tab-btn" data-mode="ranged">測試<br>槍械手勢</button>
+          <button class="mode-tab-btn" data-mode="melee">測試<br>技能手勢</button>
+          <button class="mode-tab-btn" data-mode="calibrate">定位<br>校準</button>
+          <button class="mode-tab-btn dev-tab" data-mode="record">手勢錄入<br>(開發者)</button>
         </div>
       </div>
 
@@ -315,9 +328,7 @@ export class GestureTestWindow {
       </div>
 
       <!-- Block 2: Bottom Center Panel (Exit Button) -->
-      <div id="floating-panel-bottom" class="floating-panel bottom-panel">
-        <button id="btn-return-menu" class="long-nav-btn">返回選單</button>
-      </div>
+      <button id="btn-return-menu" class="floating-panel bottom-panel">返回選單</button>
     `;
 
     document.body.appendChild(this.overlayEl);
@@ -327,7 +338,7 @@ export class GestureTestWindow {
     this.leftPanelEl = this.overlayEl.querySelector('#floating-panel-left');
     this.centerPanelEl = this.overlayEl.querySelector('#floating-panel-center');
     this.rightPanelEl = this.overlayEl.querySelector('#floating-panel-right');
-    this.bottomPanelEl = this.overlayEl.querySelector('#floating-panel-bottom');
+    this.bottomPanelEl = this.overlayEl.querySelector('#btn-return-menu');
 
     this.videoEl = this.overlayEl.querySelector('#test-video');
     this.canvasEl = this.overlayEl.querySelector('#test-canvas');
@@ -385,9 +396,18 @@ export class GestureTestWindow {
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
         background: var(--bg-deep-space);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         z-index: 1000;
         overflow: hidden;
         font-family: 'Outfit', 'Inter', sans-serif;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+        pointer-events: none;
+      }
+      .gesture-test-overlay.active-anim {
+        opacity: 1;
+        pointer-events: auto;
       }
       .gesture-test-overlay.hidden {
         display: none !important;
@@ -403,17 +423,18 @@ export class GestureTestWindow {
         box-shadow: var(--drop-shadow-vr);
         position: absolute;
         box-sizing: border-box;
-        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s ease-in-out, border-color 0.3s;
       }
       .floating-panel:hover {
         border-color: var(--glass-border-light);
       }
 
-      /* Positioning */
+      /* Positioning with collapsed defaults */
       .top-panel {
         top: 20px;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translateX(-50%) translateY(110px);
+        opacity: 0;
         width: 620px;
         height: 100px;
         padding: 10px 20px;
@@ -421,7 +442,7 @@ export class GestureTestWindow {
         flex-direction: column;
         justify-content: center;
         gap: 6px;
-        z-index: 105;
+        z-index: 90;
       }
       .panel-header-compact {
         font-family: 'Rajdhani', sans-serif;
@@ -448,6 +469,8 @@ export class GestureTestWindow {
         padding: 6px 16px;
         cursor: pointer;
         transition: all 0.25s ease;
+        line-height: 1.25;
+        text-align: center;
       }
       .mode-tab-btn:hover {
         background: var(--glass-surface-hover);
@@ -476,7 +499,7 @@ export class GestureTestWindow {
         width: 320px;
         height: 860px;
         padding: 16px 14px;
-        z-index: 95;
+        z-index: 90;
         overflow-y: auto;
       }
       .test-panel-scroll::-webkit-scrollbar {
@@ -488,9 +511,13 @@ export class GestureTestWindow {
       }
       .left-panel {
         left: calc(50% - 310px - 320px - 20px);
+        transform: translateX(340px) translateY(0);
+        opacity: 0;
       }
       .right-panel {
         right: calc(50% - 310px - 320px - 20px);
+        transform: translateX(-340px) translateY(0);
+        opacity: 0;
       }
       .side-panel-title {
         font-size: 0.95rem;
@@ -511,13 +538,15 @@ export class GestureTestWindow {
         top: 130px;
         left: 50%;
         transform: translateX(-50%);
+        opacity: 0;
         width: 620px;
         height: 750px;
         padding: 18px;
         display: flex;
         flex-direction: column;
         gap: 15px;
-        z-index: 90;
+        z-index: 110;
+        transition: opacity 0.4s ease-in-out 0.15s;
       }
       .center-controls-bar {
         display: flex;
@@ -582,17 +611,51 @@ export class GestureTestWindow {
       }
 
       /* Bottom panel - positioned closely beneath center panel at top 890px */
-      .bottom-panel {
+      button.bottom-panel {
         top: 890px;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translateX(-50%) translateY(-760px);
+        opacity: 0;
         width: 620px;
         height: 60px;
-        padding: 10px;
+        z-index: 90;
+        background: var(--glass-surface);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        color: var(--text-muted);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 1.1rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 105;
+        transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s ease-in-out, border-color 0.3s, background 0.2s, box-shadow 0.2s, color 0.2s;
+      }
+      button.bottom-panel:hover {
+        background: var(--glass-surface-hover);
+        border-color: #ff007f;
+        color: #fff;
+        box-shadow: 0 0 20px rgba(255, 0, 127, 0.3);
+      }
+
+      /* Expanded active states when overlay has .active-anim */
+      .gesture-test-overlay.active-anim .top-panel,
+      .gesture-test-overlay.active-anim .bottom-panel {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      .gesture-test-overlay.active-anim .left-panel,
+      .gesture-test-overlay.active-anim .right-panel {
+        transform: translateX(0) translateY(0);
+        opacity: 1;
+      }
+      .gesture-test-overlay.active-anim .center-panel {
+        transform: translateX(-50%);
+        opacity: 1;
+        transition: opacity 0.4s ease-in-out 0s;
       }
       .long-nav-btn {
         width: 100%;
@@ -608,6 +671,10 @@ export class GestureTestWindow {
         cursor: pointer;
         backdrop-filter: blur(8px);
         transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
       }
       .long-nav-btn:hover {
         background: rgba(255, 0, 127, 0.15);
@@ -959,6 +1026,60 @@ export class GestureTestWindow {
       .cam-reset-btn:hover {
         background: rgba(255,0,127,0.22);
       }
+      
+      /* Click visual feedback class that preserves translations */
+      button.bottom-panel.virtual-clicked {
+        transform: translateX(-50%) translateY(0) scale(0.95) !important;
+      }
+      .mode-tab-btn.virtual-clicked,
+      .action-btn.virtual-clicked,
+      .cam-reset-btn.virtual-clicked {
+        transform: scale(0.95) !important;
+      }
+
+      /* Global Gesture Loading Overlay Screen */
+      .gesture-loading-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(10, 10, 12, 0.6);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        z-index: 20000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease-in-out;
+      }
+      .gesture-loading-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .gesture-loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(0, 242, 254, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--cyan-spatial);
+        animation: spin-loader 1s linear infinite;
+      }
+      .gesture-loading-text {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #fff;
+        letter-spacing: 1px;
+      }
+      .gesture-loading-subtext {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+      }
+      @keyframes spin-loader {
+        to { transform: rotate(360deg); }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -997,6 +1118,10 @@ export class GestureTestWindow {
     tabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         this.activeTestMode = btn.getAttribute('data-mode');
+        if (this.activeTestMode === 'calibrate') {
+          this.calibrationStep = 0;
+          this.calibPoints = [];
+        }
         localStorage.setItem('gesture_studio_active_tab', this.activeTestMode);
         this.updateModeVisibility();
         this.updateCalibrationGuide();
@@ -1077,18 +1202,9 @@ export class GestureTestWindow {
   show() {
     if (this.isOpen) return;
     this.isOpen = true;
-    this.overlayEl.classList.remove('hidden');
-    console.log('[GestureTestWindow] Floating Diagnostic studio initialized.');
 
     // Sync state listeners with current GestureEngine instance
     this.setupGestureEngineListeners();
-
-    // Adjust canvas layout sizes
-    this.resizeCanvas();
-    window.addEventListener('resize', this.handleResize = () => this.resizeCanvas());
-
-    // Draw initial centered joystick overlay
-    this.drawJoystickOverlay(0, 0);
 
     // Synchronize loaded persistent settings to the buttons/views
     this.syncSettingsUI();
@@ -1097,8 +1213,28 @@ export class GestureTestWindow {
     // Initalize guide text
     this.updateCalibrationGuide();
 
-    // Start video tracking loop
-    this.initMediaPipe();
+    // Reveal overlay, starting collapsed
+    this.overlayEl.classList.remove('hidden');
+    this.overlayEl.classList.remove('active-anim');
+
+    // Adjust canvas layout sizes
+    this.resizeCanvas();
+    window.addEventListener('resize', this.handleResize = () => this.resizeCanvas());
+
+    // Draw initial centered joystick overlay
+    this.drawJoystickOverlay(0, 0);
+
+    // Force reflow
+    this.overlayEl.offsetHeight;
+
+    // Trigger expand transition
+    this.overlayEl.classList.add('active-anim');
+    console.log('[GestureTestWindow] Floating Diagnostic studio initialized.');
+
+    // Start video tracking loop if not running
+    if (!this.cameraStream) {
+      this.initMediaPipe();
+    }
   }
 
   /**
@@ -1135,11 +1271,25 @@ export class GestureTestWindow {
   hide() {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.overlayEl.classList.add('hidden');
     console.log('[GestureTestWindow] Hiding Diagnostic studio.');
 
     window.removeEventListener('resize', this.handleResize);
-    this.stopTracking();
+    
+    // If global gesture control is disabled, stop camera tracking on exit to save CPU/resources
+    const isEnabledGlobally = localStorage.getItem('gesture_control_enabled') === 'true';
+    if (!isEnabledGlobally) {
+      this.stopTracking();
+    }
+
+    // Trigger collapse transition
+    this.overlayEl.classList.remove('active-anim');
+
+    // Hide overlay completely after transition plays out
+    setTimeout(() => {
+      if (!this.isOpen) {
+        this.overlayEl.classList.add('hidden');
+      }
+    }, 500);
   }
 
   /**
@@ -1188,6 +1338,10 @@ export class GestureTestWindow {
    * Feed camera frames into MediaPipe Holistic analyzer.
    */
   async initMediaPipe() {
+    if (this.cameraStream || this.holisticInstance) {
+      console.log('[GestureTestWindow] MediaPipe is already running/initialized.');
+      return;
+    }
     try {
       await this.loadScripts();
 
@@ -1212,14 +1366,12 @@ export class GestureTestWindow {
 
       this.cameraStream = new window.Camera(this.videoEl, {
         onFrame: async () => {
-          if (this.isOpen) {
-            // Apply brightness/contrast pre-filter to the off-screen canvas
-            // then send that processed canvas to MediaPipe for better tracking
-            this.processCtx.filter = `brightness(${this.camBrightness}%) contrast(${this.camContrast}%)`;
-            this.processCtx.drawImage(this.videoEl, 0, 0, 640, 480);
-            this.processCtx.filter = 'none';
-            await holistic.send({ image: this.processCanvas });
-          }
+          // Apply brightness/contrast pre-filter to the off-screen canvas
+          // then send that processed canvas to MediaPipe for better tracking
+          this.processCtx.filter = `brightness(${this.camBrightness}%) contrast(${this.camContrast}%)`;
+          this.processCtx.drawImage(this.videoEl, 0, 0, 640, 480);
+          this.processCtx.filter = 'none';
+          await holistic.send({ image: this.processCanvas });
         },
         width: 640,
         height: 480,
@@ -1271,6 +1423,9 @@ export class GestureTestWindow {
       }
       this.holisticInstance = null;
     }
+
+    // Sync status to the widget
+    this.updateCameraStatus('未啟用');
   }
 
   /**
@@ -1279,6 +1434,49 @@ export class GestureTestWindow {
   updateCameraStatus(text) {
     if (this.cameraStatusEl) {
       this.cameraStatusEl.textContent = `狀態：${text}`;
+    }
+
+    // Unify status updates with the global bottom-right control widget
+    const widgetText = document.getElementById('gesture-widget-status-text');
+    const widgetDot = document.getElementById('gesture-widget-status-dot');
+    if (widgetText && widgetDot) {
+      widgetText.textContent = `手勢狀態：${text}`;
+
+      // Dynamically update dot color classes based on status text keywords
+      if (text.includes('連線成功')) {
+        widgetDot.className = 'status-dot-widget active'; // cyan success
+      } else if (text.includes('失敗') || text.includes('錯誤')) {
+        widgetDot.className = 'status-dot-widget error'; // red error
+      } else if (text.includes('未啟用')) {
+        widgetDot.className = 'status-dot-widget'; // grey default
+      } else {
+        // Any intermediate initialization/active-opening state defaults to orange (initializing)
+        widgetDot.className = 'status-dot-widget initializing';
+      }
+    }
+
+    // Manage global loading screen overlay visibility & text
+    let loadingOverlay = document.getElementById('gesture-loading-overlay');
+    if (!loadingOverlay && document.body) {
+      loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'gesture-loading-overlay';
+      loadingOverlay.className = 'gesture-loading-overlay';
+      loadingOverlay.innerHTML = `
+        <div class="gesture-loading-spinner"></div>
+        <div class="gesture-loading-text">正在啟動相機與手勢引擎...</div>
+        <div class="gesture-loading-subtext">請稍候，加載完成後將自動啟用手勢操作。</div>
+      `;
+      document.body.appendChild(loadingOverlay);
+    }
+
+    if (loadingOverlay) {
+      if (text.includes('連線成功') || text.includes('失敗') || text.includes('錯誤') || text.includes('未啟用')) {
+        loadingOverlay.classList.remove('active');
+      } else {
+        loadingOverlay.classList.add('active');
+        const textEl = loadingOverlay.querySelector('.gesture-loading-text');
+        if (textEl) textEl.textContent = text;
+      }
     }
   }
 
@@ -1330,8 +1528,8 @@ export class GestureTestWindow {
       'left-ult': (mode === 'record' || mode === 'ranged' || mode === 'melee'),
 
       // Right Hand
-      'right-cursor': (mode === 'record' || mode === 'basic'),
-      'right-pinch': (mode === 'record' || mode === 'basic'),
+      'right-cursor': (mode === 'record' || mode === 'basic' || mode === 'calibrate'),
+      'right-pinch': (mode === 'record' || mode === 'basic' || mode === 'calibrate'),
       'right-gun': (mode === 'record' || mode === 'ranged' || mode === 'melee'),
       'right-reload': (mode === 'record' || mode === 'ranged'),
       'right-sync-aim-fire': (mode === 'record' || mode === 'ranged'),
@@ -1369,8 +1567,6 @@ export class GestureTestWindow {
    * Render diagnostic overlays and process gesture engine data loops.
    */
   onResults(results) {
-    if (!this.isOpen) return;
-
     // Transition from webcam connection to active tracking when the first results frame arrives
     if (!this.isMediaPipeActive) {
       this.isMediaPipeActive = true;
@@ -1379,19 +1575,8 @@ export class GestureTestWindow {
 
     try {
       this.latestResults = results;
-      this.ctx.clearRect(0, 0, this.canvasEl.width, this.canvasEl.height);
 
-      const w = this.canvasEl.width;
-      const h = this.canvasEl.height;
-
-      // Draw dark holographic grid in privacy mode
-      if (!this.showVideoFeed) {
-        this.ctx.fillStyle = '#060614';
-        this.ctx.fillRect(0, 0, w, h);
-        this.drawCyberGrid(w, h);
-      }
-
-      // Feed raw data to GestureEngine logic handler
+      // Feed raw data to GestureEngine logic handler (needed globally across all UI states)
       if (this.app.gestureEngine) {
         this.app.gestureEngine.processFrame(
           results.leftHandLandmarks,
@@ -1400,21 +1585,97 @@ export class GestureTestWindow {
         );
       }
 
-      // Draw skeleton joints overlays
-      if (results.poseLandmarks) {
-        this.drawPoseSkeleton(results.poseLandmarks, w, h);
+      // Global virtual cursor coordinate update
+      if (results.rightHandLandmarks && this.app.uiManager) {
+        const indexTip = results.rightHandLandmarks[8];
+        const thumbTip = results.rightHandLandmarks[4];
+        if (indexTip && thumbTip) {
+          const dist = Math.sqrt((indexTip.x - thumbTip.x) ** 2 + (indexTip.y - thumbTip.y) ** 2);
+          const isPinching = dist < 0.035;
+          const isPinchStarting = dist < 0.055;
+
+          // Detect rising edge of pinch for calibration with debounce cooldown
+          if (isPinching && !this.lastIsPinching) {
+            if (!this.calibClickCooldown) {
+              this.calibClickCooldown = true;
+              this.handleCalibrationPinch(indexTip.x, indexTip.y);
+              setTimeout(() => {
+                this.calibClickCooldown = false;
+              }, 1000); // 1.0s debounce cooldown to prevent double-registration on camera jitter
+            }
+          }
+          this.lastIsPinching = isPinching;
+
+          this.app.uiManager.updateGestureCursor(indexTip.x, indexTip.y, isPinching, isPinchStarting);
+        }
+      } else {
+        this.lastIsPinching = false;
+        if (this.app.uiManager) {
+          // Clear/hide the cursor if right hand is not visible
+          this.app.uiManager.updateGestureCursor(undefined, undefined, false);
+        }
       }
 
-      if (results.leftHandLandmarks) {
-        this.drawHandLandmarks(results.leftHandLandmarks, w, h, '#ff007f');
-      }
+      // Visual canvas skeleton draw & details cards update (only if Test Window is active / open)
+      if (this.isOpen) {
+        this.ctx.clearRect(0, 0, this.canvasEl.width, this.canvasEl.height);
 
-      if (results.rightHandLandmarks) {
-        this.drawHandLandmarks(results.rightHandLandmarks, w, h, '#00ffcc');
-      }
+        const w = this.canvasEl.width;
+        const h = this.canvasEl.height;
 
-      // Synchronize cards states inside side columns in real-time
-      this.updateDiagnosticHUD(results);
+        // Draw Comfortable Bounds Rect if calibrate tab is active
+        if (this.activeTestMode === 'calibrate') {
+          const xMin = parseFloat(localStorage.getItem('gesture_calib_xMin')) || 0.15;
+          const xMax = parseFloat(localStorage.getItem('gesture_calib_xMax')) || 0.85;
+          const yMin = parseFloat(localStorage.getItem('gesture_calib_yMin')) || 0.20;
+          const yMax = parseFloat(localStorage.getItem('gesture_calib_yMax')) || 0.80;
+
+          this.ctx.save();
+          this.ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)';
+          this.ctx.lineWidth = 2.5;
+          this.ctx.setLineDash([8, 6]);
+          this.ctx.strokeRect(xMin * w, yMin * h, (xMax - xMin) * w, (yMax - yMin) * h);
+          this.ctx.setLineDash([]);
+          
+          this.ctx.fillStyle = 'rgba(0, 255, 204, 0.06)';
+          this.ctx.fillRect(xMin * w, yMin * h, (xMax - xMin) * w, (yMax - yMin) * h);
+
+          // Draw text non-mirrored (double-flip horizontally)
+          this.ctx.translate(w, 0);
+          this.ctx.scale(-1, 1);
+          this.ctx.fillStyle = 'rgba(0, 255, 204, 0.9)';
+          this.ctx.font = 'bold 13px Rajdhani, sans-serif';
+          this.ctx.textAlign = 'right'; // Grows to the right on mirrored screen
+          
+          // Draw text aligned horizontally in flipped coordinate space
+          this.ctx.fillText('舒適操作活動邊界 (Comfortable Bounds)', w - (xMin * w + 12), yMin * h - 10);
+          this.ctx.textAlign = 'left'; // Reset alignment to default
+          this.ctx.restore();
+        }
+
+        // Draw dark holographic grid in privacy mode
+        if (!this.showVideoFeed) {
+          this.ctx.fillStyle = '#060614';
+          this.ctx.fillRect(0, 0, w, h);
+          this.drawCyberGrid(w, h);
+        }
+
+        // Draw skeleton joints overlays
+        if (results.poseLandmarks) {
+          this.drawPoseSkeleton(results.poseLandmarks, w, h);
+        }
+
+        if (results.leftHandLandmarks) {
+          this.drawHandLandmarks(results.leftHandLandmarks, w, h, '#ff007f');
+        }
+
+        if (results.rightHandLandmarks) {
+          this.drawHandLandmarks(results.rightHandLandmarks, w, h, '#00ffcc');
+        }
+
+        // Synchronize cards states inside side columns in real-time
+        this.updateDiagnosticHUD(results);
+      }
     } catch (err) {
       console.error('[GestureTestWindow] Exception during onResults loop:', err);
     }
@@ -1660,10 +1921,6 @@ export class GestureTestWindow {
         const getDistance = (p1, p2) => Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
         const dist = getDistance(thumbTip, indexTip);
         const isPinching = dist < 0.035;
-
-        if (this.app.uiManager) {
-          this.app.uiManager.updateGestureCursor(indexTip.x, indexTip.y, isPinching);
-        }
 
         if (isPinching) {
           el.className = 'gesture-card active';
@@ -2073,6 +2330,112 @@ export class GestureTestWindow {
           <li style="color:#e63946;"><em>🚫 模式限制：此模式下已禁用左手 OK 瞄準與右手 Reload 手勢。</em></li>
         </ul>
       `;
+    } else if (this.activeTestMode === 'calibrate') {
+      const xMin = localStorage.getItem('gesture_calib_xMin') || '0.150';
+      const xMax = localStorage.getItem('gesture_calib_xMax') || '0.850';
+      const yMin = localStorage.getItem('gesture_calib_yMin') || '0.200';
+      const yMax = localStorage.getItem('gesture_calib_yMax') || '0.800';
+
+      let stepText = '';
+      if (this.calibrationStep === 0) {
+        stepText = '請點選下方的【開始校準】按鈕開始。';
+      } else if (this.calibrationStep === 1) {
+        stepText = '<span style="color:#00ffcc; font-size:1.1rem; font-weight:bold;">[步驟 1/4]：請將右手移至您的【左上角】舒適極限位置並捏合(Pinch)進行紀錄。</span>';
+      } else if (this.calibrationStep === 2) {
+        stepText = '<span style="color:#00ffcc; font-size:1.1rem; font-weight:bold;">[步驟 2/4]：請將右手移至您的【右上角】舒適極限位置並捏合(Pinch)進行紀錄。</span>';
+      } else if (this.calibrationStep === 3) {
+        stepText = '<span style="color:#00ffcc; font-size:1.1rem; font-weight:bold;">[步驟 3/4]：請將右手移至您的【左下角】舒適極限位置並捏合(Pinch)進行紀錄。</span>';
+      } else if (this.calibrationStep === 4) {
+        stepText = '<span style="color:#00ffcc; font-size:1.1rem; font-weight:bold;">[步驟 4/4]：請將右手移至您的【右下角】舒適極限位置並捏合(Pinch)進行紀錄。</span>';
+      } else if (this.calibrationStep === 5) {
+        stepText = '<span style="color:#ffb703; font-size:1.1rem; font-weight:bold;">🎉 校準成功！已將您的個人化舒適活動邊界儲存至瀏覽器。</span>';
+      }
+
+      this.calibrationGuideEl.innerHTML = `
+        <h4 style="margin-top: 0;">手勢操作定位校準 (Comfort Boundary Calibration)</h4>
+        <div style="margin: 6px 0; font-size: 0.88rem; line-height: 1.4; color: #cbd5e1;">
+          <p style="margin: 0 0 10px 0;">由於每個人的坐姿、站姿、離鏡頭距離及手臂長度不同，您可以自定義一個舒適的手部活動範圍（相機畫面中的子區域），該區域會被放大映射至整個螢幕的邊界。</p>
+          <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin: 10px 0; border: 1px solid rgba(0,255,204,0.15);">
+            <strong>當前狀態/指引：</strong> <div style="margin-top:4px;">${stepText}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; font-family: 'Share Tech Mono', monospace; font-size: 0.9rem;">
+            <span>X 範圍: [${xMin} ~ ${xMax}]</span>
+            <span>Y 範圍: [${yMin} ~ ${yMax}]</span>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 12px;">
+            <button id="btn-start-calib" style="flex: 1; background: var(--cyan-spatial); color: black; font-weight: bold; border-radius: 8px; border:none; height: 32px; cursor: pointer; font-family: inherit; font-size: 0.9rem; transition: background 0.2s;">開始校準</button>
+            <button id="btn-reset-calib" style="flex: 1; background: rgba(255,255,255,0.1); color: white; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); height: 32px; cursor: pointer; font-family: inherit; font-size: 0.9rem; transition: all 0.2s;">重置為預設值</button>
+          </div>
+        </div>
+      `;
+
+      // Bind button events dynamically
+      const startBtn = this.calibrationGuideEl.querySelector('#btn-start-calib');
+      const resetBtn = this.calibrationGuideEl.querySelector('#btn-reset-calib');
+      if (startBtn) {
+        startBtn.addEventListener('click', () => {
+          this.calibrationStep = 1;
+          this.calibPoints = [];
+          this.updateCalibrationGuide();
+        });
+      }
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          localStorage.removeItem('gesture_calib_xMin');
+          localStorage.removeItem('gesture_calib_xMax');
+          localStorage.removeItem('gesture_calib_yMin');
+          localStorage.removeItem('gesture_calib_yMax');
+          this.calibrationStep = 0;
+          this.updateCalibrationGuide();
+          if (this.app.uiManager) {
+            this.app.uiManager.loadCalibrationData();
+          }
+        });
+      }
     }
+  }
+
+  /**
+   * Record hand coordinate calibration points when a pinch rising edge occurs.
+   */
+  handleCalibrationPinch(cx, cy) {
+    if (this.activeTestMode !== 'calibrate' || this.calibrationStep < 1 || this.calibrationStep > 4) {
+      return;
+    }
+
+    this.calibPoints.push({ x: cx, y: cy });
+    console.log(`[Calibration] Step ${this.calibrationStep} recorded: x=${cx.toFixed(3)}, y=${cy.toFixed(3)}`);
+
+    this.calibrationStep++;
+
+    if (this.calibrationStep === 5) {
+      const p1 = this.calibPoints[0]; // Top-Left
+      const p2 = this.calibPoints[1]; // Top-Right
+      const p3 = this.calibPoints[2]; // Bottom-Left
+      const p4 = this.calibPoints[3]; // Bottom-Right
+
+      const xMin = (p1.x + p3.x) / 2;
+      const xMax = (p2.x + p4.x) / 2;
+      const yMin = (p1.y + p2.y) / 2;
+      const yMax = (p3.y + p4.y) / 2;
+
+      // Safe clamp bounds
+      const finalXMin = Math.min(xMin, xMax);
+      const finalXMax = Math.max(xMin, xMax);
+      const finalYMin = Math.min(yMin, yMax);
+      const finalYMax = Math.max(yMin, yMax);
+
+      localStorage.setItem('gesture_calib_xMin', finalXMin.toFixed(3));
+      localStorage.setItem('gesture_calib_xMax', finalXMax.toFixed(3));
+      localStorage.setItem('gesture_calib_yMin', finalYMin.toFixed(3));
+      localStorage.setItem('gesture_calib_yMax', finalYMax.toFixed(3));
+
+      // Reload calibration mapping factors globally
+      if (this.app.uiManager) {
+        this.app.uiManager.loadCalibrationData();
+      }
+    }
+
+    this.updateCalibrationGuide();
   }
 }

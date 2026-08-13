@@ -32,3 +32,10 @@ dist-ssr
 
 # Vite cache
 .vite
+
+# Electron build output (upload to GitHub Releases instead)
+dist_electron/
+
+
+# test_data
+test_data/
