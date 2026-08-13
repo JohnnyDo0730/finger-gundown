@@ -163,33 +163,40 @@ export class MenuManager {
             <div class="guide-step">
               <span class="step-num">2</span>
               <div class="step-text">
-                <strong>鏡頭採集與舒適活動區間校正</strong>
-                <p>調整鏡頭亮度與曝光曝光，使畫面清晰易辨識；接著切換至定位校準分頁，依照提示在舒適的四角進行捏合錄製，使系統能根據您的舒適活動範圍精準縮放游標。</p>
+                <strong>鏡頭設置與環境調整</strong>
+                <p>在測試頁面調整相機亮度與對比度，使背景清晰。理想拍攝環境應避免強烈逆光或局部過曝（過曝會使手部邊緣模糊），且背景中儘量不要有其他人影或雜物干擾，以確保手勢精準辨識。</p>
               </div>
             </div>
             <div class="guide-step">
               <span class="step-num">3</span>
               <div class="step-text">
-                <strong>熟悉槍械與技能手勢</strong>
-                <p>在不同類別下練習並熟悉各類別手勢動作（例如比讚舉槍瞄準、扣指射擊、握拳蓄力、雙手三角形大招等）。</p>
+                <strong>活動區間與舒適度校正</strong>
+                <p>切換至測試頁的定位校準分頁，依照提示在您手部擺動最舒適的四個角落進行捏合錄製，讓系統校準您的手勢穩定辨識區間，精準映射至整個螢幕邊界。</p>
               </div>
             </div>
             <div class="guide-step">
               <span class="step-num">4</span>
+              <div class="step-text">
+                <strong>練習槍械與技能手勢</strong>
+                <p>在不同類別下練習並熟悉各類別手勢動作（例如比讚舉槍瞄準、扣指射擊、握拳蓄力、雙手三角形大招等）。</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-num">5</span>
               <div class="step-text">
                 <strong>開啟手勢操作</strong>
                 <p>勾選右下角的「啟用手勢操作」，即可將雙手手勢無縫應用於主選單與各頁面的虛擬游標控制與互動。</p>
               </div>
             </div>
             <div class="guide-step">
-              <span class="step-num">5</span>
+              <span class="step-num">6</span>
               <div class="step-text">
                 <strong>閱讀武器技能說明</strong>
                 <p>點選「武器選擇」頁面，可隨時查看每款雷射手槍、突擊步槍或魔法太刀的核心被動、主動技能與對應手勢。</p>
               </div>
             </div>
             <div class="guide-step">
-              <span class="step-num">6</span>
+              <span class="step-num">7</span>
               <div class="step-text">
                 <strong>進入遊戲，享受冒險</strong>
                 <p>一切準備就緒後，點擊「開始遊戲」投身戰場，盡情享受全身心沉浸的手勢射擊遊戲體驗！</p>
@@ -792,9 +799,11 @@ export class MenuManager {
         background: rgba(20, 21, 26, 0.85);
         border: 1px solid var(--glass-border);
         border-radius: 24px;
-        width: 600px;
-        max-width: 90%;
-        max-height: 85%;
+        width: 620px;
+        height: 750px;
+        max-width: 95%;
+        max-height: 90vh;
+        box-sizing: border-box;
         padding: 30px;
         box-shadow: var(--drop-shadow-vr);
         display: flex;
@@ -1058,7 +1067,6 @@ export class MenuManager {
     this.overlayEl.querySelector('#btn-exit').addEventListener('click', () => {
       if (confirm('確定要關閉遊戲嗎？')) {
         window.close();
-        alert('退出遊戲 (請關閉此瀏覽器分頁)');
       }
     });
 
