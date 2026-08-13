@@ -19,7 +19,8 @@
   },
   "build": {
     "appId": "com.johnnyd.finger-gundown",
-    "productName": "Finger Gundown",
+    "productName": "FingerGundown",
+    "artifactName": "${productName}-${version}.${ext}",
     "asar": true,
     "files": [
       "dist/**/*",
