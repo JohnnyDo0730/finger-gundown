@@ -91,6 +91,14 @@ export class GestureEngine {
   }
 
   /**
+   * Periodic tick update for cooldowns and animations.
+   * @param {number} timestamp 
+   */
+  update(timestamp) {
+    // No-op or updates internal timer ticks if required
+  }
+
+  /**
    * Register listener for specific gesture events.
    */
   addEventListener(eventName, callback) {

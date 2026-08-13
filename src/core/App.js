@@ -2,6 +2,7 @@ import { StateManager } from './StateManager.js';
 import { GestureTestWindow } from '../ui/GestureTestWindow.js';
 import { MenuManager } from '../ui/MenuManager.js';
 import { GestureEngine } from '../gestures/GestureEngine.js';
+import { GameWorld } from '../game/GameWorld.js';
 
 /**
  * App - Central orchestrator for the Web 3D gesture-control game.
@@ -11,12 +12,12 @@ export class App {
   constructor() {
     this.stateManager = new StateManager();
     this.gestureEngine = new GestureEngine();
+    this.gameManager = new GameWorld(this); // Set up Three.js scene, camera, lights, floor grid
     this.gestureTestWindow = new GestureTestWindow(this);
     this.uiManager = new MenuManager(this);
     
     // Subsystem instances placeholders (to be instantiated in stages 2-5)
-    this.cameraController = null;
-    this.gameManager = null;
+    this.cameraController = this.gameManager.playerController; // Set via GameWorld
 
     // Animation frame handle
     this.rafHandle = null;
@@ -39,11 +40,25 @@ export class App {
         const curr = this.stateManager.getState();
         if (curr === 'PLAYING') {
           this.stateManager.transitionTo('PAUSED');
-        } else if (curr === 'PAUSED') {
-          this.stateManager.transitionTo('PLAYING');
         }
       });
     }
+
+    // Listen to Escape key to toggle pause
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const curr = this.stateManager.getState();
+        if (curr === 'PLAYING') {
+          this.stateManager.transitionTo('PAUSED');
+        } else if (curr === 'PAUSED') {
+          if (this.uiManager && typeof this.uiManager.resumeGameWithTransition === 'function') {
+            this.uiManager.resumeGameWithTransition();
+          } else {
+            this.stateManager.transitionTo('PLAYING');
+          }
+        }
+      }
+    });
 
     // Start main game loop (it will handle conditional logic based on states)
     this.startLoop();
@@ -89,6 +104,13 @@ export class App {
     
     // 3. Stop active gameplay simulation but keep rendering background
     if (this.gameManager) this.gameManager.pauseSimulation();
+
+    // 4. If global gesture control is disabled, stop camera tracking on exit to menu
+    const isEnabledGlobally = localStorage.getItem('gesture_control_enabled') === 'true';
+    if (!isEnabledGlobally && this.gestureTestWindow) {
+      console.log('[App] Auto-stopping gesture engine on main menu return.');
+      this.gestureTestWindow.stopTracking();
+    }
   }
 
   onEnterTestMode() {
@@ -102,17 +124,26 @@ export class App {
     
     // 3. Gesture engine: full visualization output
     if (this.gestureEngine) this.gestureEngine.setMode('DEBUG');
+
+    // 4. Freeze active game physics simulation
+    if (this.gameManager) this.gameManager.pauseSimulation();
   }
 
   onEnterPlaying() {
     // 1. Hide menu overlays, show game HUD
     if (this.uiManager) this.uiManager.showGameHUD();
-
+ 
     // 2. Resume or Start game loop/physics
     if (this.gameManager) this.gameManager.resumeSimulation();
-
+ 
     // 3. Set gesture recognition to gameplay action mode
     if (this.gestureEngine) this.gestureEngine.setMode('GAMEPLAY');
+
+    // 4. Auto-initialize camera stream for gameplay if tracking is inactive
+    if (this.gestureTestWindow && !this.gestureTestWindow.cameraStream) {
+      console.log('[App] Auto-starting camera feed and tracking engine for gameplay.');
+      this.gestureTestWindow.initMediaPipe();
+    }
   }
 
   onEnterPaused() {
@@ -153,11 +184,11 @@ export class App {
     // 1. Always update UI manager (animations/transitions)
     if (this.uiManager) this.uiManager.update(timestamp);
 
-    // 2. Conditional updates based on state
+    // 2. Always update 3D Game World background renderer and simulation updates
+    if (this.gameManager) this.gameManager.update(timestamp);
+ 
+    // 3. Conditional updates based on state
     if (currentState === 'PLAYING') {
-      // Run Three.js rendering and game physics loop
-      if (this.gameManager) this.gameManager.update(timestamp);
-      
       // Update gesture recognition
       if (this.gestureEngine) this.gestureEngine.update(timestamp);
     } 

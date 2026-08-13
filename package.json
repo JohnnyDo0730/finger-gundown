@@ -1,7 +1,7 @@
 {
   "name": "finger-gundown",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A web 3D gesture-control game powered by Three.js & MediaPipe Holistic.",
   "author": "JohnnyDo0730",
   "type": "module",

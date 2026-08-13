@@ -70,6 +70,16 @@ export class MenuManager {
           <button id="btn-exit" class="menu-btn danger">退出遊戲</button>
         </div>
       </div>
+ 
+      <!-- Pause Menu Card -->
+      <div id="pause-panel" class="menu-panel hidden">
+        <h2 id="pause-title">遊戲暫停</h2>
+        <div class="menu-btn-list">
+          <button id="btn-pause-resume" class="menu-btn"><span class="btn-glow"></span>繼續遊戲</button>
+          <button id="btn-pause-weapons" class="menu-btn">查看技能</button>
+          <button id="btn-pause-menu" class="menu-btn danger">返回主畫面</button>
+        </div>
+      </div>
 
       <!-- Weapon Selection Fullscreen Layout mirroring Diagnostic Studio -->
       <div id="weapons-panel" class="weapons-panel-wrapper hidden">
@@ -270,6 +280,7 @@ export class MenuManager {
     // Bind DOM cache
     this.menuPanelEl = this.overlayEl.querySelector('#menu-panel');
     this.weaponsPanelEl = this.overlayEl.querySelector('#weapons-panel');
+    this.pausePanelEl = this.overlayEl.querySelector('#pause-panel');
 
     // Populate Ranged and Melee weapons list sidebars dynamically
     const rangedSidebar = this.overlayEl.querySelector('#ranged-weapons-sidebar');
@@ -506,9 +517,9 @@ export class MenuManager {
         transition: opacity 0.4s ease-in-out 0.15s;
       }
       .weapons-panel-wrapper button.bottom-panel {
-        top: 890px;
+        bottom: 20px;
         left: 50%;
-        transform: translateX(-50%) translateY(-760px);
+        transform: translateX(-50%) translateY(100px);
         opacity: 0;
         width: 620px;
         height: 60px;
@@ -1030,8 +1041,85 @@ export class MenuManager {
    */
   bindEvents() {
     // Play button
-    this.overlayEl.querySelector('#btn-play').addEventListener('click', () => {
-      this.app.stateManager.transitionTo('PLAYING');
+    const btnPlay = this.overlayEl.querySelector('#btn-play');
+    if (btnPlay) {
+      btnPlay.addEventListener('click', () => {
+        // Check if hand tracking is already active (cameraStream exists)
+        const isTrackingActive = this.app.gestureTestWindow && this.app.gestureTestWindow.cameraStream;
+        
+        if (!isTrackingActive && this.app.gestureTestWindow) {
+          // 1. Show the loading screen first
+          this.showGestureLoadingOverlay(true, '正在啟動遊戲相機與手勢引擎...', '首次啟動需要數秒時間載入，載入後將自動開始遊戲。');
+          
+          // 2. Start MediaPipe initialization
+          this.app.gestureTestWindow.initMediaPipe()
+            .then(() => {
+              this.showGestureLoadingOverlay(false);
+              // 3. Now run the play transition portal
+              this.runPlayTransition(btnPlay);
+            })
+            .catch((err) => {
+              console.error(err);
+              this.showGestureLoadingOverlay(false);
+              // Fallback modal if webcam permission denied or missing
+              this.showConfirmModal('無法啟動相機與手勢追蹤，請確認是否有授予相機權限！您要直接以滑鼠/鍵盤進入遊戲嗎？', () => {
+                this.runPlayTransition(btnPlay);
+              });
+            });
+        } else {
+          this.runPlayTransition(btnPlay);
+        }
+      });
+    }
+
+    // Pause Resume button
+    const btnPauseResume = this.overlayEl.querySelector('#btn-pause-resume');
+    if (btnPauseResume) {
+      btnPauseResume.addEventListener('click', () => {
+        this.resumeGameWithTransition();
+      });
+    }
+
+    // Pause View Weapons / Skills button
+    this.overlayEl.querySelector('#btn-pause-weapons').addEventListener('click', () => {
+      // Collapse pause panel
+      this.pausePanelEl.classList.add('collapsed');
+      this.pausePanelEl.classList.add('hidden');
+
+      // Show weapons selection panel, starting collapsed
+      this.weaponsPanelEl.classList.remove('hidden');
+      this.weaponsPanelEl.classList.remove('active-anim');
+      this.weaponsPanelEl.offsetHeight;
+      this.weaponsPanelEl.classList.add('active-anim');
+      this.renderWeaponDetails();
+    });
+
+    // Pause Return to Menu button
+    this.overlayEl.querySelector('#btn-pause-menu').addEventListener('click', () => {
+      this.showConfirmModal('確定要返回主畫面嗎？您的當前遊戲進度將重置。', () => {
+        // Confirmed: 
+        // 1. Let the confirm modal fade out immediately (takes ~400ms).
+        // Wait 250ms for it to fade out before starting the pause card collapse sequence.
+        setTimeout(() => {
+          // 2. Q-elastic bounce collapse:
+          // Slightly scale up first (bouncing outward, taking 0.25s)
+          this.pausePanelEl.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)';
+          this.pausePanelEl.style.transform = 'translateX(-50%) scale(1.08)';
+
+          // 3. Wait 300ms (so it hovers/pauses briefly at 1.08) before accelerating shrink
+          setTimeout(() => {
+            // Shrink over 0.6s, but delay the opacity fade-out by 0.4s (takes 0.2s) so the shrink is visible before vanishing
+            this.pausePanelEl.style.transition = 'transform 0.6s cubic-bezier(0.95, 0.05, 0.795, 0.035), opacity 0.2s ease-in 0.4s';
+            this.pausePanelEl.style.transform = 'translateX(-50%) scale(0.4)';
+            this.pausePanelEl.style.opacity = '0';
+
+            // 4. Wait 850ms (0.6s shrink + 0.25s blank space) before transitioning to MENU to delay the main menu fade-in
+            setTimeout(() => {
+              this.app.stateManager.transitionTo('MENU');
+            }, 850);
+          }, 300);
+        }, 250);
+      });
     });
 
     // Weapons list button
@@ -1065,9 +1153,9 @@ export class MenuManager {
 
     // Exit button
     this.overlayEl.querySelector('#btn-exit').addEventListener('click', () => {
-      if (confirm('確定要關閉遊戲嗎？')) {
+      this.showConfirmModal('確定要關閉遊戲嗎？', () => {
         window.close();
-      }
+      });
     });
 
     // Close Weapons button
@@ -1075,15 +1163,18 @@ export class MenuManager {
       // 1. Collapse weapons panel
       this.weaponsPanelEl.classList.remove('active-anim');
 
-      // 2. Show main menu panel, starting collapsed
-      this.menuPanelEl.classList.remove('hidden');
-      this.menuPanelEl.classList.add('collapsed');
+      const currentState = this.app.stateManager.getState();
+      const targetPanel = currentState === 'PAUSED' ? this.pausePanelEl : this.menuPanelEl;
+
+      // 2. Show target panel, starting collapsed
+      targetPanel.classList.remove('hidden');
+      targetPanel.classList.add('collapsed');
 
       // Force reflow
-      this.menuPanelEl.offsetHeight;
+      targetPanel.offsetHeight;
 
-      // 3. Expand main menu panel
-      this.menuPanelEl.classList.remove('collapsed');
+      // 3. Expand target panel
+      targetPanel.classList.remove('collapsed');
 
       // Hide weapons panel wrapper after transition finishes
       setTimeout(() => {
@@ -1108,42 +1199,117 @@ export class MenuManager {
   /**
    * Monitor StateManager to toggle overlays.
    */
+  /**
+   * Monitor StateManager to toggle overlays.
+   */
   syncState() {
     this.app.stateManager.subscribe((newState) => {
-      if (newState === 'MENU' || newState === 'PAUSED') {
+      // Hide or show bottom-right gesture control toggle widget depending on gameplay state
+      const widget = document.getElementById('gesture-toggle-widget');
+      if (widget) {
+        if (newState === 'PLAYING') {
+          widget.style.display = 'none';
+        } else {
+          widget.style.display = '';
+        }
+      }
+
+      if (newState === 'MENU' || newState === 'PAUSED' || newState === 'TEST_MODE') {
         this.overlayEl.classList.remove('hidden');
 
-        const playBtn = this.overlayEl.querySelector('#btn-play');
-        const menuTitle = this.overlayEl.querySelector('#menu-title');
-
         if (newState === 'PAUSED') {
-          playBtn.innerHTML = '<span class="btn-glow"></span>繼續遊戲';
-          menuTitle.textContent = 'GAME PAUSED';
-
+          // Collapse other panels
           this.menuPanelEl.classList.add('collapsed');
           this.menuPanelEl.classList.add('hidden');
-          this.weaponsPanelEl.classList.remove('hidden');
+          this.weaponsPanelEl.classList.remove('active-anim');
+          this.weaponsPanelEl.classList.add('hidden');
+
+          // Smoothly fade in backdrop overlay
+          this.overlayEl.style.transition = 'none';
+          this.overlayEl.style.opacity = '0';
+
+          // Show pause panel, starting collapsed (keeping center translate)
+          this.pausePanelEl.classList.remove('hidden');
+          this.pausePanelEl.classList.remove('collapsed'); // REMOVE COLLAPSED SO IT REMAINS ACTIVE
+          this.pausePanelEl.style.transition = 'none';
+          this.pausePanelEl.style.transform = 'translateX(-50%) scale(0.85)';
+          this.pausePanelEl.style.opacity = '0';
 
           // Force reflow
-          this.weaponsPanelEl.offsetHeight;
-          this.weaponsPanelEl.classList.add('active-anim');
-          this.renderWeaponDetails();
-        } else {
-          playBtn.innerHTML = '<span class="btn-glow"></span>開始遊戲';
-          menuTitle.textContent = 'FINGER GUNDOWN';
+          this.overlayEl.offsetHeight;
+
+          // Expand pause panel and fade in backdrop
+          this.overlayEl.style.transition = 'opacity 0.4s ease';
+          this.overlayEl.style.opacity = '1';
+
+          this.pausePanelEl.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease-out';
+          this.pausePanelEl.style.transform = 'translateX(-50%) scale(1.0)';
+          this.pausePanelEl.style.opacity = '1';
+
+          // Reset inline styles after transition completes
+          setTimeout(() => {
+            this.overlayEl.style.opacity = '';
+            this.overlayEl.style.transition = '';
+            this.pausePanelEl.style.transform = '';
+            this.pausePanelEl.style.opacity = '';
+            this.pausePanelEl.style.transition = '';
+          }, 400);
+        } else if (newState === 'MENU') {
+          // Collapse other panels
+          this.pausePanelEl.classList.add('collapsed');
+          this.pausePanelEl.classList.add('hidden');
+          this.pausePanelEl.style.transform = '';
+          this.pausePanelEl.style.opacity = '';
+          this.pausePanelEl.style.transition = '';
 
           this.weaponsPanelEl.classList.remove('active-anim');
           this.weaponsPanelEl.classList.add('hidden');
+
+          // Show menu panel, just fading in (opacity only, no scale/displacement)
           this.menuPanelEl.classList.remove('hidden');
+          this.menuPanelEl.classList.remove('collapsed'); // REMOVE COLLAPSED SO IT REMAINS VISIBLE AND ACTIVE
+          this.menuPanelEl.style.transition = 'none';
+          this.menuPanelEl.style.opacity = '0';
 
           // Force reflow
           this.menuPanelEl.offsetHeight;
-          this.menuPanelEl.classList.remove('collapsed');
+
+          // Slower, cinematic fade-in to distinguish from the pause overlay (slowed to 1.5s)
+          this.menuPanelEl.style.transition = 'opacity 1.5s cubic-bezier(0.25, 1, 0.5, 1)';
+          this.menuPanelEl.style.opacity = '1';
+
+          // Clean up inline styles after transition completes (matches 1.5s duration)
+          setTimeout(() => {
+            this.menuPanelEl.style.transition = '';
+            this.menuPanelEl.style.opacity = '';
+          }, 1500);
+        } else if (newState === 'TEST_MODE') {
+          // Collapse main menu, pause, and weapons panels, keeping the main dark backdrop visible
+          this.menuPanelEl.classList.add('collapsed');
+          this.pausePanelEl.classList.add('collapsed');
+          this.weaponsPanelEl.classList.remove('active-anim');
+          this.weaponsPanelEl.classList.add('hidden');
+
+          // Hide menu/pause panels completely after transition finishes (500ms later)
+          setTimeout(() => {
+            const curr = this.app.stateManager.getState();
+            if (curr === 'TEST_MODE') {
+              this.menuPanelEl.classList.add('hidden');
+              this.pausePanelEl.classList.add('hidden');
+            }
+          }, 500);
         }
       } else {
         // Transitioning away from MENU / PAUSED (e.g. to PLAYING or TEST_MODE)
         this.menuPanelEl.classList.add('collapsed');
+        this.pausePanelEl.classList.add('collapsed');
         this.weaponsPanelEl.classList.remove('active-anim');
+
+        // Smoothly fade out the overlay backdrop along with any card transitions (skip if going to TEST_MODE to prevent flashing)
+        if (newState !== 'TEST_MODE') {
+          this.overlayEl.style.transition = 'opacity 0.5s ease-out';
+          this.overlayEl.style.opacity = '0';
+        }
 
         // Wait for slide/fade out transitions to finish before adding hidden
         setTimeout(() => {
@@ -1151,7 +1317,12 @@ export class MenuManager {
           if (currState !== 'MENU' && currState !== 'PAUSED') {
             this.overlayEl.classList.add('hidden');
             this.menuPanelEl.classList.add('hidden');
+            this.pausePanelEl.classList.add('hidden');
             this.weaponsPanelEl.classList.add('hidden');
+            
+            // Reset inline styles
+            this.overlayEl.style.opacity = '';
+            this.overlayEl.style.transition = '';
           }
         }, 500);
       }
@@ -1467,5 +1638,166 @@ export class MenuManager {
   }
   update(timestamp) {
     // Optional animations tick
+  }
+
+  /**
+   * Resumes the game with a smooth fade-out overlay and scale-down pause card transition.
+   */
+  resumeGameWithTransition() {
+    if (!this.pausePanelEl) return;
+    
+    // 1. Fade out overlay backdrop
+    this.overlayEl.style.transition = 'opacity 0.4s ease';
+    this.overlayEl.style.opacity = '0';
+
+    // 2. Scale down and fade out pause panel (keeping translateX center)
+    this.pausePanelEl.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s';
+    this.pausePanelEl.style.transform = 'translateX(-50%) scale(0.8)';
+    this.pausePanelEl.style.opacity = '0';
+
+    // 3. Wait for transition to finish, then set state to PLAYING (inline style resets will be handled inside syncState's transition finish timer)
+    setTimeout(() => {
+      this.app.stateManager.transitionTo('PLAYING');
+    }, 400);
+  }
+
+  /**
+   * Show a premium custom confirmation dialog in game UI style.
+   * @param {string} message - Message text to display
+   * @param {function} onConfirm - Callback executed when OK is clicked
+   * @param {function} onCancel - Callback executed when Cancel/Close is clicked
+   */
+  showConfirmModal(message, onConfirm, onCancel) {
+    let modal = document.getElementById('confirm-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'confirm-modal';
+      modal.className = 'gesture-guide-modal'; // Reuse existing backdrop styling
+      modal.innerHTML = `
+        <div class="gesture-guide-content" style="transform: none !important; transform-origin: center !important; width: 450px; height: auto; min-height: 200px; padding: 30px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; background: rgba(20, 21, 26, 0.9); border: 1px solid var(--glass-border); border-radius: 20px;">
+          <div class="gesture-guide-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h3 style="margin: 0; color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 1.3rem; letter-spacing: 1px;">系統確認 (CONFIRMATION)</h3>
+            <button id="btn-confirm-close" class="close-guide-btn" style="font-size: 1.5rem; color: var(--text-muted); background: transparent; border: none; cursor: pointer;">&times;</button>
+          </div>
+          <div style="font-size: 0.98rem; color: #f0f3ff; line-height: 1.6; text-align: center; font-weight: 500;" id="confirm-modal-text"></div>
+          <div style="display: flex; gap: 20px; justify-content: center; width: 100%; margin-top: 10px;">
+            <button id="btn-confirm-ok" class="menu-btn" style="flex: 1; height: 55px; border-color: rgba(0, 242, 254, 0.4); background: rgba(0, 242, 254, 0.12); font-size: 1.1rem; font-weight: bold; letter-spacing: 2px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px;"><span class="btn-glow"></span>確定</button>
+            <button id="btn-confirm-cancel" class="menu-btn danger" style="flex: 1; height: 55px; font-size: 1.1rem; font-weight: bold; letter-spacing: 2px; margin: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px;">取消</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.querySelector('#btn-confirm-close').addEventListener('click', () => {
+        modal.classList.remove('active');
+        if (onCancel) onCancel();
+      });
+    }
+
+    modal.querySelector('#confirm-modal-text').textContent = message;
+
+    const okBtn = modal.querySelector('#btn-confirm-ok');
+    const cancelBtn = modal.querySelector('#btn-confirm-cancel');
+
+    // Clean old listeners by cloning
+    const newOk = okBtn.cloneNode(true);
+    const newCancel = cancelBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    newOk.addEventListener('click', () => {
+      modal.classList.remove('active');
+      if (onConfirm) onConfirm();
+    });
+
+    newCancel.addEventListener('click', () => {
+      modal.classList.remove('active');
+      if (onCancel) onCancel();
+    });
+
+    modal.classList.add('active');
+  }
+
+  /**
+   * Run the play portal circle ripple transition.
+   * @param {HTMLElement} btnPlay - The button that triggered the transition
+   */
+  runPlayTransition(btnPlay) {
+    // Trigger the expanding circle transition from the play button's center
+    const rect = btnPlay.getBoundingClientRect();
+    const ripple = document.createElement('div');
+    ripple.id = 'play-transition-ripple';
+    ripple.style.position = 'fixed';
+    ripple.style.left = `${rect.left + rect.width / 2}px`;
+    ripple.style.top = `${rect.top + rect.height / 2}px`;
+    ripple.style.width = '0px';
+    ripple.style.height = '0px';
+    ripple.style.borderRadius = '50%';
+    // Bright off-white/light gray gradient matching the new white-gray game tone
+    ripple.style.background = 'radial-gradient(circle, rgba(241, 243, 245, 0.95) 0%, rgba(220, 225, 230, 0.98) 75%, #f1f3f5 100%)';
+    ripple.style.transform = 'translate(-50%, -50%)';
+    // Slowed expanding transition to 1.4s
+    ripple.style.transition = 'width 1.4s cubic-bezier(0.25, 1, 0.5, 1), height 1.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s ease-in-out';
+    ripple.style.zIndex = '99999';
+    ripple.style.pointerEvents = 'none';
+    document.body.appendChild(ripple);
+
+    // Force reflow
+    ripple.offsetHeight;
+
+    const size = Math.max(window.innerWidth, window.innerHeight) * 2.5;
+    ripple.style.width = `${size}px`;
+    ripple.style.height = `${size}px`;
+
+    // Scale and fade out menu panel slightly (keeping translateX center) (slowed to 1.0s/0.9s)
+    this.menuPanelEl.style.transition = 'transform 1.0s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.9s';
+    this.menuPanelEl.style.transform = 'translateX(-50%) scale(0.85)';
+    this.menuPanelEl.style.opacity = '0';
+
+    // Fade out overlay backdrop smoothly along with the ripple (slowed to 1.0s)
+    this.overlayEl.style.transition = 'opacity 1.0s ease-out';
+    this.overlayEl.style.opacity = '0';
+
+    // Wait 1.1s before changing state to PLAYING to let ripple settle
+    setTimeout(() => {
+      this.app.stateManager.transitionTo('PLAYING');
+      ripple.style.opacity = '0';
+      
+      setTimeout(() => {
+        if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
+        this.menuPanelEl.style.transform = '';
+        this.menuPanelEl.style.opacity = '';
+        this.menuPanelEl.style.transition = '';
+        this.overlayEl.style.opacity = '';
+        this.overlayEl.style.transition = '';
+      }, 600);
+    }, 1100);
+  }
+
+  /**
+   * Helper to toggle the global MediaPipe loader overlay.
+   */
+  showGestureLoadingOverlay(show, text = '正在啟動相機與手勢引擎...', subtext = '請稍候，加載完成後將自動啟用手勢操作。') {
+    let loadingOverlay = document.getElementById('gesture-loading-overlay');
+    if (!loadingOverlay) {
+      loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'gesture-loading-overlay';
+      loadingOverlay.className = 'gesture-loading-overlay';
+      loadingOverlay.innerHTML = `
+        <div class="gesture-loading-spinner"></div>
+        <div class="gesture-loading-text">${text}</div>
+        <div class="gesture-loading-subtext">${subtext}</div>
+      `;
+      document.body.appendChild(loadingOverlay);
+    } else {
+      loadingOverlay.querySelector('.gesture-loading-text').textContent = text;
+      loadingOverlay.querySelector('.gesture-loading-subtext').textContent = subtext;
+    }
+    
+    if (show) {
+      loadingOverlay.classList.add('active');
+    } else {
+      loadingOverlay.classList.remove('active');
+    }
   }
 }

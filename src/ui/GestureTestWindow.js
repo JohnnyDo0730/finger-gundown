@@ -395,9 +395,9 @@ export class GestureTestWindow {
       .gesture-test-overlay {
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
-        background: var(--bg-deep-space);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: transparent !important; /* Delegate backdrop background to main menu overlay to prevent dark flash */
+        backdrop-filter: none !important; /* Delegate blur to main menu overlay to prevent duplicate blur */
+        -webkit-backdrop-filter: none !important;
         z-index: 1000;
         overflow: hidden;
         font-family: 'Outfit', 'Inter', sans-serif;
