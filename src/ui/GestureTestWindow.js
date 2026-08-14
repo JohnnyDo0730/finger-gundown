@@ -12,7 +12,7 @@ export class GestureTestWindow {
   constructor(app) {
     this.app = app;
     this.isOpen = false;
-    
+
     // Load last persistent tab selection or default to 'basic'
     this.activeTestMode = localStorage.getItem('gesture_studio_active_tab') || 'basic';
 
@@ -22,7 +22,7 @@ export class GestureTestWindow {
 
     this.latestResults = null;
     this.recordedPoses = this.loadRecordedPoses();
-    
+
     // Flag to split webcam camera connection vs. actual MediaPipe model activation
     this.isMediaPipeActive = false;
 
@@ -37,7 +37,7 @@ export class GestureTestWindow {
       isPaused: false,
       isPauseActive: false,
       lastSlash: null,
-      
+
       // Interface connections placeholders
       isRightSkillActive: false,
       isRightSkillTriggered: false,
@@ -62,7 +62,7 @@ export class GestureTestWindow {
 
     // Camera visual filter (brightness + contrast, saved to localStorage)
     this.camBrightness = parseInt(localStorage.getItem('gesture_cam_brightness') || '100', 10);
-    this.camContrast  = parseInt(localStorage.getItem('gesture_cam_contrast')  || '110', 10);
+    this.camContrast = parseInt(localStorage.getItem('gesture_cam_contrast') || '110', 10);
 
     // Calibration step tracking
     this.calibrationStep = 0;
@@ -246,7 +246,7 @@ export class GestureTestWindow {
         
         <div class="viewport-box">
           <span id="camera-status-label" class="camera-status">狀態：等待連接相機...</span>
-          <video id="test-video" class="test-video-feed" autoplay playsinline muted></video>
+          <video id="test-video" class="test-video-feed" autoplay playsinline webkit-playsinline muted></video>
           <canvas id="test-canvas" class="test-canvas-feed"></canvas>
         </div>
 
@@ -280,19 +280,19 @@ export class GestureTestWindow {
         <!-- Right Hand Cards (Re-ordered to group weapon behaviors cleanly) -->
         <div class="gesture-card" id="card-right-cursor">
           <h4>選單游標座標 <span class="status-dot"></span></h4>
-          <p>食指尖指向螢幕，映射游標位置</p>
+          <p>移入右手，以大拇指頂點映射游標位置</p>
           <div class="card-status-text">等待右手偵測...</div>
         </div>
 
         <div class="gesture-card" id="card-right-pinch">
           <h4>Pinch 捏合點擊 <span class="status-dot"></span></h4>
-          <p>食指與大拇指捏合以點擊按鈕</p>
+          <p>大拇指與食指捏合碰觸以點選或開火</p>
           <div class="card-status-text">等待右手偵測...</div>
         </div>
 
         <div class="gesture-card" id="card-right-gun">
-          <h4>舉槍與發射 <span class="status-dot"></span></h4>
-          <p>比讚舉槍(Aim) / 食指扣動開槍(Fire)</p>
+          <h4>瞄準與開火 <span class="status-dot"></span></h4>
+          <p>右手移入瞄準(Aim) / 碰觸捏合開槍(Fire)</p>
           <div class="card-status-text">等待右手偵測...</div>
         </div>
 
@@ -347,7 +347,7 @@ export class GestureTestWindow {
     // Apply saved brightness/contrast filter to the visible video feed immediately
     this.videoEl.style.filter = `brightness(${this.camBrightness}%) contrast(${this.camContrast}%)`;
     this.videoEl.style.webkitFilter = `brightness(${this.camBrightness}%) contrast(${this.camContrast}%)`;
-    
+
     this.closeBtnEl = this.overlayEl.querySelector('#btn-return-menu');
     this.cameraStatusEl = this.overlayEl.querySelector('#camera-status-label');
     this.calibrationGuideEl = this.overlayEl.querySelector('#calibration-guide-container');
@@ -368,7 +368,7 @@ export class GestureTestWindow {
         const titleEl = card.querySelector('h4');
         const descEl = card.querySelector('p');
         const configItem = ActionConfig[id];
-        
+
         if (titleEl && configItem.name) {
           // Keep the status-dot element intact if present
           const dot = titleEl.querySelector('.status-dot');
@@ -617,7 +617,7 @@ export class GestureTestWindow {
         transform: translateX(-50%) translateY(-760px);
         opacity: 0;
         width: 620px;
-        height: 60px;
+        height: 80px;
         z-index: 90;
         background: var(--glass-surface);
         border: 1px solid var(--glass-border);
@@ -1135,9 +1135,9 @@ export class GestureTestWindow {
 
     // 5. Camera filter sliders (brightness & contrast)
     const sliderBrightness = this.overlayEl.querySelector('#slider-brightness');
-    const sliderContrast   = this.overlayEl.querySelector('#slider-contrast');
-    const valBrightness    = this.overlayEl.querySelector('#brightness-val');
-    const valContrast      = this.overlayEl.querySelector('#contrast-val');
+    const sliderContrast = this.overlayEl.querySelector('#slider-contrast');
+    const valBrightness = this.overlayEl.querySelector('#brightness-val');
+    const valContrast = this.overlayEl.querySelector('#contrast-val');
 
     // Restore saved values
     if (sliderBrightness) {
@@ -1171,13 +1171,13 @@ export class GestureTestWindow {
     if (btnReset) {
       btnReset.addEventListener('click', () => {
         this.camBrightness = 100;
-        this.camContrast   = 110;
+        this.camContrast = 110;
         if (sliderBrightness) sliderBrightness.value = 100;
-        if (sliderContrast)   sliderContrast.value   = 110;
-        if (valBrightness)    valBrightness.textContent = 100;
-        if (valContrast)      valContrast.textContent   = 110;
+        if (sliderContrast) sliderContrast.value = 110;
+        if (valBrightness) valBrightness.textContent = 100;
+        if (valContrast) valContrast.textContent = 110;
         localStorage.setItem('gesture_cam_brightness', 100);
-        localStorage.setItem('gesture_cam_contrast',   110);
+        localStorage.setItem('gesture_cam_contrast', 110);
         this._applyCamFilter();
       });
     }
@@ -1274,7 +1274,7 @@ export class GestureTestWindow {
     console.log('[GestureTestWindow] Hiding Diagnostic studio.');
 
     window.removeEventListener('resize', this.handleResize);
-    
+
     // If global gesture control is disabled, stop camera tracking on exit to save CPU/resources
     const isEnabledGlobally = localStorage.getItem('gesture_control_enabled') === 'true';
     if (!isEnabledGlobally) {
@@ -1376,7 +1376,9 @@ export class GestureTestWindow {
         width: 640,
         height: 480,
         // Request 60fps for smoother gesture tracking (browser will use best available)
-        frameRate: { ideal: 60, min: 30 }
+        frameRate: { ideal: 60, min: 30 },
+        // Prefer front-facing (selfie) camera on mobile devices; desktop will ignore this
+        facingMode: { ideal: 'user' }
       });
 
       this.cameraStream.start()
@@ -1385,7 +1387,7 @@ export class GestureTestWindow {
         })
         .catch(err => {
           console.error('[GestureTestWindow] Camera failed:', err);
-          this.updateCameraStatus('錯誤：相機鏡頭開啟失敗！請檢查權限。');
+          this._handleCameraError(err);
         });
 
       this.holisticInstance = holistic;
@@ -1429,9 +1431,79 @@ export class GestureTestWindow {
   }
 
   /**
+   * Handle camera access errors with user-friendly messages.
+   * Differentiates between HTTPS requirement, permission denial, and device not found.
+   * @param {Error} err - The error thrown by getUserMedia / Camera.start()
+   */
+  _handleCameraError(err) {
+    const name = err && err.name ? err.name : '';
+    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+    // Case 1: Not running over HTTPS (browser blocks camera on insecure origins)
+    if (!isSecure) {
+      this.updateCameraStatus('錯誤：需要 HTTPS 才能存取相機！');
+      alert(
+        '⚠️ 無法存取相機\n\n' +
+        '瀏覽器安全政策要求必須透過 HTTPS 連線才能使用相機。\n\n' +
+        '請改用 https:// 開頭的網址開啟本頁，或在 localhost 環境下測試。'
+      );
+      return;
+    }
+
+    // Case 2: User explicitly denied camera permission
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      this.updateCameraStatus('錯誤：相機權限遭拒！');
+      alert(
+        '⚠️ 相機權限被拒絕\n\n' +
+        '您已拒絕本頁面存取相機的權限，手勢辨識功能將無法使用。\n\n' +
+        '請依以下步驟重新授權：\n' +
+        '• iOS Safari：設定 → Safari → 相機 → 詢問或允許\n' +
+        '• Android Chrome：網址列左側鎖頭圖示 → 相機 → 允許\n' +
+        '• 桌面瀏覽器：網址列右側相機圖示 → 允許存取\n\n' +
+        '授權後請重新整理頁面。'
+      );
+      return;
+    }
+
+    // Case 3: No camera device found on the device
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      this.updateCameraStatus('錯誤：找不到相機裝置！');
+      alert(
+        '⚠️ 找不到相機\n\n' +
+        '目前裝置上未偵測到可用的相機裝置，請確認：\n' +
+        '• 相機硬體已正確連接（筆電內建鏡頭或外接 USB 鏡頭）\n' +
+        '• 相機驅動程式已正確安裝\n' +
+        '• 沒有其他程式正在佔用相機'
+      );
+      return;
+    }
+
+    // Case 4: Camera is already in use by another application
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      this.updateCameraStatus('錯誤：相機被其他程式佔用！');
+      alert(
+        '⚠️ 相機無法使用\n\n' +
+        '相機目前正被其他程式或分頁佔用中。\n\n' +
+        '請關閉其他使用相機的應用程式（如視訊會議軟體）後，重新整理本頁面。'
+      );
+      return;
+    }
+
+    // Case 5: Generic / unknown error fallback
+    this.updateCameraStatus('錯誤：相機鏡頭開啟失敗！');
+    alert(
+      '⚠️ 相機開啟失敗\n\n' +
+      `錯誤類型：${name || '未知錯誤'}\n` +
+      `詳細訊息：${err.message || '無'}\n\n` +
+      '請檢查瀏覽器相機權限設定後重新嘗試，或開啟開發者主控台查看詳細錯誤。'
+    );
+  }
+
+  /**
    * Update webcam status string.
    */
   updateCameraStatus(text) {
+
     if (this.cameraStatusEl) {
       this.cameraStatusEl.textContent = `狀態：${text}`;
     }
@@ -1496,7 +1568,7 @@ export class GestureTestWindow {
         this.app.gestureEngine.setWeaponMode(mode);
       }
     }
-    
+
     // Left and right hand panels are now permanently visible across ALL modes (including record)
     this.leftPanelEl.classList.remove('hidden');
     this.rightPanelEl.classList.remove('hidden');
@@ -1528,7 +1600,7 @@ export class GestureTestWindow {
       'left-ult': (mode === 'record' || mode === 'ranged' || mode === 'melee'),
 
       // Right Hand
-      'right-cursor': (mode === 'record' || mode === 'basic' || mode === 'calibrate'),
+      'right-cursor': (mode === 'record' || mode === 'basic' || mode === 'calibrate' || mode === 'ranged' || mode === 'melee'),
       'right-pinch': (mode === 'record' || mode === 'basic' || mode === 'calibrate'),
       'right-gun': (mode === 'record' || mode === 'ranged' || mode === 'melee'),
       'right-reload': (mode === 'record' || mode === 'ranged'),
@@ -1594,11 +1666,13 @@ export class GestureTestWindow {
           const isPinching = dist < 0.035;
           const isPinchStarting = dist < 0.055;
 
+          const smoothed = this.app.gestureEngine.getSmoothedCursorCoords();
+
           // Detect rising edge of pinch for calibration with debounce cooldown
           if (isPinching && !this.lastIsPinching) {
             if (!this.calibClickCooldown) {
               this.calibClickCooldown = true;
-              this.handleCalibrationPinch(indexTip.x, indexTip.y);
+              this.handleCalibrationPinch(smoothed.x, smoothed.y);
               setTimeout(() => {
                 this.calibClickCooldown = false;
               }, 1000); // 1.0s debounce cooldown to prevent double-registration on camera jitter
@@ -1606,7 +1680,7 @@ export class GestureTestWindow {
           }
           this.lastIsPinching = isPinching;
 
-          this.app.uiManager.updateGestureCursor(indexTip.x, indexTip.y, isPinching, isPinchStarting);
+          this.app.uiManager.updateGestureCursor(smoothed.x, smoothed.y, isPinching, isPinchStarting);
         }
       } else {
         this.lastIsPinching = false;
@@ -1636,7 +1710,7 @@ export class GestureTestWindow {
           this.ctx.setLineDash([8, 6]);
           this.ctx.strokeRect(xMin * w, yMin * h, (xMax - xMin) * w, (yMax - yMin) * h);
           this.ctx.setLineDash([]);
-          
+
           this.ctx.fillStyle = 'rgba(0, 255, 204, 0.06)';
           this.ctx.fillRect(xMin * w, yMin * h, (xMax - xMin) * w, (yMax - yMin) * h);
 
@@ -1646,7 +1720,7 @@ export class GestureTestWindow {
           this.ctx.fillStyle = 'rgba(0, 255, 204, 0.9)';
           this.ctx.font = 'bold 13px Rajdhani, sans-serif';
           this.ctx.textAlign = 'right'; // Grows to the right on mirrored screen
-          
+
           // Draw text aligned horizontally in flipped coordinate space
           this.ctx.fillText('舒適操作活動邊界 (Comfortable Bounds)', w - (xMin * w + 12), yMin * h - 10);
           this.ctx.textAlign = 'left'; // Reset alignment to default
@@ -1840,7 +1914,7 @@ export class GestureTestWindow {
     updateCard('left-joystick', (el, txt) => {
       const mx = this.gestureData.moveX;
       const my = this.gestureData.moveY;
-      
+
       // If Left hand Aim is active, movement is locked to 0
       if (this.gestureData.isLeftAimActive) {
         el.className = 'gesture-card suppressed-item';
@@ -1918,7 +1992,7 @@ export class GestureTestWindow {
       const indexTip = results.rightHandLandmarks[8];
       const thumbTip = results.rightHandLandmarks[4];
       if (indexTip && thumbTip) {
-        const getDistance = (p1, p2) => Math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2);
+        const getDistance = (p1, p2) => Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
         const dist = getDistance(thumbTip, indexTip);
         const isPinching = dist < 0.035;
 
@@ -1944,7 +2018,7 @@ export class GestureTestWindow {
         if (txt) txt.textContent = '瞄準鎖定中 (ON_AIM)...';
       } else {
         el.className = 'gesture-card ready';
-        if (txt) txt.textContent = '偵測中：待命 (比讚+食指朝前)';
+        if (txt) txt.textContent = '偵測中：待命 (右手移入並捏合)';
       }
     });
 
@@ -2028,7 +2102,7 @@ export class GestureTestWindow {
     ctx.strokeStyle = 'rgba(0, 255, 204, 0.22)';
     ctx.lineWidth = 2.5;
     ctx.stroke();
-    
+
     // Draw crosshair axes
     ctx.beginPath();
     ctx.moveTo(cx - radius, cy);
@@ -2058,10 +2132,10 @@ export class GestureTestWindow {
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
-    
+
     // Reset shadow
     ctx.shadowBlur = 0;
-    
+
     // Draw center connecting vector line
     if (isActive) {
       ctx.beginPath();
@@ -2103,8 +2177,8 @@ export class GestureTestWindow {
     this.ctx.fillStyle = '#ff007f';
     this.ctx.beginPath();
     this.ctx.moveTo(targetX, targetY);
-    this.ctx.lineTo(targetX - 18 * Math.cos(angle - Math.PI/6), targetY - 18 * Math.sin(angle - Math.PI/6));
-    this.ctx.lineTo(targetX - 18 * Math.cos(angle + Math.PI/6), targetY - 18 * Math.sin(angle + Math.PI/6));
+    this.ctx.lineTo(targetX - 18 * Math.cos(angle - Math.PI / 6), targetY - 18 * Math.sin(angle - Math.PI / 6));
+    this.ctx.lineTo(targetX - 18 * Math.cos(angle + Math.PI / 6), targetY - 18 * Math.sin(angle + Math.PI / 6));
     this.ctx.closePath();
     this.ctx.fill();
 
@@ -2224,7 +2298,7 @@ export class GestureTestWindow {
 
     this.recordedPoses.push(record);
     localStorage.setItem('neural_arena_recorded_poses', JSON.stringify(this.recordedPoses));
-    
+
     this.updateRecordUI();
     this.poseNameInput.value = '';
     console.log('[PoseRecorder] Recorded frame:', record);
@@ -2259,7 +2333,7 @@ export class GestureTestWindow {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `neural_arena_recorded_poses_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `neural_arena_recorded_poses_${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2300,8 +2374,8 @@ export class GestureTestWindow {
           <li><strong>左手移動搖桿：</strong>掌心朝鏡頭，前傾前進、左右側傾控制轉向。</li>
           <li><strong>左手握拳後退：</strong>左手五指合攏握拳，可快速往後移動。</li>
           <li><strong>左手暫停選單：</strong>五指伸直完全併攏（掌心朝前）維持 <strong>${pauseTime} 秒</strong>，以開啟或暫停選單。</li>
-          <li><strong>右手選單游標：</strong>右手食指指尖指向螢幕，對準映射畫面中的發光游標。</li>
-          <li><strong>右手 Pinch 點擊：</strong>大拇指與食指捏合，用以觸發虛擬點擊動作。</li>
+          <li><strong>右手選單游標：</strong>右手移入畫面，對準映射畫面中的發光游標（已改用穩定大拇指追蹤）。</li>
+          <li><strong>右手 Pinch 點擊：</strong>大拇指與食指捏合，用以觸發虛擬點擊與射擊發射動作。</li>
         </ul>
       `;
     } else if (this.activeTestMode === 'ranged') {
@@ -2310,8 +2384,8 @@ export class GestureTestWindow {
         <ul class="calibration-list">
           <li><strong>左手搖桿移動：</strong>支援前傾前進、握拳後退與併攏暫停遊戲。</li>
           <li><strong>左手精準瞄準 (Sync Aim)：</strong>左手比出【OK 手勢】維持 <strong>${aimTime} 秒</strong>開啟；開合中指可調節 1.0x ~ 4.0x 放大鏡倍率。</li>
-          <li><strong>右手舉槍瞄準 (Aim)：</strong>右手大拇指朝上（比讚），食指指向螢幕即鎖定視角。</li>
-          <li><strong>右手扣下扳機 (Fire)：</strong>食指快速向下彎曲扣動（可單點開槍）。</li>
+          <li><strong>右手移動瞄準 (Aim)：</strong>右手移入相機畫面即可控制空間準心。</li>
+          <li><strong>右手捏合開火 (Fire)：</strong>大拇指與食指捏合 (Pinch) 即可單點發射雷射。</li>
           <li><strong>右手手勢裝彈 (Reload)：</strong>將右手翻為【手背朝前且食指伸直】維持 <strong>${reloadCharge} 秒</strong>，裝彈動作鎖定武器 <strong>${reloadLock} 秒</strong>。</li>
           <li><strong>右手蓄力技能 (投擲武器)：</strong>握拳拳頭朝上（上鉤拳姿勢）維持 <strong>${skillCharge} 秒</strong>，鎖定 <strong>${skillLock} 秒</strong> 施法動畫。</li>
           <li><strong>雙手蓄力大招 (等離子屏障)：</strong>雙手合攏比三角形維持 <strong>${ultCharge} 秒</strong>，鎖定 <strong>${ultLock} 秒</strong> 發動期（期間禁止移動）。</li>
@@ -2324,7 +2398,7 @@ export class GestureTestWindow {
         <ul class="calibration-list">
           <li><strong>左手搖桿移動：</strong>支援前傾前進、握拳後退與併攏暫停遊戲.</li>
           <li><strong>右手近戰揮砍 (Slash)：</strong>食指指尖快速揮掃（速度門檻需高於 1.5 units/s）以劃出刀光。</li>
-          <li><strong>右手普通射擊 (連發招式)：</strong>比讚（拇指朝上）並下彎食指，可用於施放快速法球等連發技能。</li>
+          <li><strong>右手普通射擊 (連發招式)：</strong>大拇指與食指捏合 (Pinch) 觸發碰觸射擊，可用於施放快速法球等連發技能。</li>
           <li><strong>右手蓄力技能 (裂地衝擊)：</strong>握拳拳頭朝上維持 <strong>${skillCharge} 秒</strong>，鎖定 <strong>${skillLock} 秒</strong> 施法動畫。</li>
           <li><strong>雙手蓄力大招 (等離子屏障)：</strong>雙手合攏比三角形維持 <strong>${ultCharge} 秒</strong>，鎖定 <strong>${ultLock} 秒</strong> 發動期（期間禁止移動）。</li>
           <li style="color:#e63946;"><em>🚫 模式限制：此模式下已禁用左手 OK 瞄準與右手 Reload 手勢。</em></li>

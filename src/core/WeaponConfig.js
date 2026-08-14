@@ -144,12 +144,12 @@ export const WeaponConfig = {
     category: 'ranged',
     isPlayable: true,
     description: '配備高集束光子發射器，為本競技場之基本配備。適合遠程狙擊或定點清理，射擊精準度極高，但每次發射需要一定的散熱冷卻時間。',
-    shootCooldown: 300,
+    shootCooldown: 450,
     reloadTime: 2000,
     damage: 10,
     passive: {
       name: '爐心溶解',
-      description: '配備無限能源電池，不需擔心備彈。但每次發射皆會累積熱能。連續快速射擊會累積過載，需手動執行過載冷卻以加速排熱，否則會進入 1.5 秒熔斷鎖定。'
+      description: '配備無限能源電池，不需擔心備彈，但每次發射皆會累積熱能。連續快速射擊會導致武器過熱，需手動執行過載冷卻以加速排熱，否則過熱時會自動強制換彈，且換彈時間會加倍為 4.0 秒。'
     },
     hiveActions: {
       'fire': { name: '熱能光束', active: true, desc: '單點發射高能熱磁雷射，具備穿透路徑上所有敵人的電磁效能。' },

@@ -5,7 +5,10 @@ export default defineConfig({
   base: './',
   server: {
     port: 3000,
-    open: true
+    host: '0.0.0.0',  // Expose to all network interfaces (required for ngrok)
+    open: true,
+    // Allow all external hosts including ngrok tunnels
+    allowedHosts: true
   },
   build: {
     outDir: 'dist'

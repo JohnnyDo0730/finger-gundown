@@ -1,4 +1,6 @@
 import { PlayerController } from './PlayerController.js';
+import { EnemyManager } from './EnemyManager.js';
+import { GunSystem } from './GunSystem.js';
 
 const THREE = window.THREE;
 
@@ -26,7 +28,12 @@ export class GameWorld {
     this.dirLight = null;
     this.pointLight = null;
 
+    // Enemy system reference
+    this.enemyManager = null;
+    this.gunSystem = null;
+
     this.init();
+    window.gameWorld = this; // Expose globally for testing/verification
   }
 
   /**
@@ -118,7 +125,13 @@ export class GameWorld {
     this.playerController = new PlayerController(this.camera, this.app);
     this.app.cameraController = this.playerController; // Expose to App coordinator
 
-    // 7. Setup clock tracker
+    // 7. Instantiate EnemyManager
+    this.enemyManager = new EnemyManager(this.app, this);
+
+    // 8. Instantiate GunSystem
+    this.gunSystem = new GunSystem(this.app, this);
+
+    // 9. Setup clock tracker
     this.clock = new THREE.Clock();
 
     // 8. Bind resize events
@@ -171,9 +184,17 @@ export class GameWorld {
       deltaTime = 0.1;
     }
 
-    // 1. Run physical gameplay changes (player positioning, etc.) if unpaused
-    if (!this.isSimulationPaused && this.playerController) {
-      this.playerController.update(deltaTime);
+    // 1. Run physical gameplay changes (player positioning, enemies, etc.) if unpaused
+    if (!this.isSimulationPaused) {
+      if (this.playerController) {
+        this.playerController.update(deltaTime);
+      }
+      if (this.enemyManager) {
+        this.enemyManager.update(deltaTime);
+      }
+      if (this.gunSystem) {
+        this.gunSystem.update(deltaTime);
+      }
     }
 
     // 2. Render current WebGL viewport frame (runs constantly in background to keep screen fluid)
@@ -181,10 +202,70 @@ export class GameWorld {
   }
 
   /**
+   * Reset game state to start a clean new match.
+   */
+  reset() {
+    console.log('[GameWorld] Resetting game world state...');
+    
+    // 1. Reset player position and rotation
+    if (this.playerController) {
+      this.playerController.position.set(0, 1.6, 30);
+      this.playerController.yaw = 0;
+      this.playerController.currentSpeed = 0;
+      this.playerController.moveX = 0;
+      this.playerController.moveY = 0;
+      // Sync camera pos
+      this.playerController.camera.position.copy(this.playerController.position);
+      this.playerController.camera.rotation.set(0, 0, 0);
+    }
+
+    // 2. Reset enemies (clear and seed again)
+    if (this.enemyManager) {
+      this.enemyManager.clearAll();
+      this.enemyManager.enemies = [];
+      this.enemyManager.enemyIdCounter = 0;
+      this.enemyManager.init(); // Reseeds the row of 5 dummies
+    }
+
+    // 3. Reset weapons / gun system
+    if (this.gunSystem) {
+      // Clear bullets
+      this.gunSystem.bullets.forEach((bullet) => {
+        this.scene.remove(bullet.mesh);
+        if (bullet.mesh.geometry) bullet.mesh.geometry.dispose();
+        if (bullet.mesh.material) bullet.mesh.material.dispose();
+      });
+      this.gunSystem.bullets = [];
+      
+      // Reset ammo, heat, reload status
+      this.gunSystem.ammo = 12;
+      this.gunSystem.maxAmmo = 12;
+      this.gunSystem.isReloading = false;
+      this.gunSystem.reloadTimer = 0.0;
+      this.gunSystem.shootCooldownTimer = 0.0;
+      this.gunSystem.heat = 0.0;
+      this.gunSystem.isOverheated = false;
+      this.gunSystem.overheatTimer = 0.0;
+      this.gunSystem.updateHUDUI();
+    }
+  }
+
+  /**
    * Dispose WebGL context and remove mounted elements.
    */
   destroy() {
     console.log('[GameWorld] Tearing down 3D environment...');
+    
+    // Clear and dispose all active targets
+    if (this.enemyManager) {
+      this.enemyManager.clearAll();
+    }
+
+    // Clear and dispose weapon system
+    if (this.gunSystem) {
+      this.gunSystem.destroy();
+    }
+
     window.removeEventListener('resize', this.resizeHandler);
 
     if (this.renderer && this.renderer.domElement) {

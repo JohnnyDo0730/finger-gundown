@@ -3,6 +3,7 @@ import { GestureTestWindow } from '../ui/GestureTestWindow.js';
 import { MenuManager } from '../ui/MenuManager.js';
 import { GestureEngine } from '../gestures/GestureEngine.js';
 import { GameWorld } from '../game/GameWorld.js';
+import { WeaponConfig } from '../core/WeaponConfig.js';
 
 /**
  * App - Central orchestrator for the Web 3D gesture-control game.
@@ -85,6 +86,9 @@ export class App {
         this.onEnterTestMode();
         break;
       case 'PLAYING':
+        if (oldState === 'MENU' && this.gameManager && typeof this.gameManager.reset === 'function') {
+          this.gameManager.reset();
+        }
         this.onEnterPlaying();
         break;
       case 'PAUSED':
@@ -136,8 +140,18 @@ export class App {
     // 2. Resume or Start game loop/physics
     if (this.gameManager) this.gameManager.resumeSimulation();
  
-    // 3. Set gesture recognition to gameplay action mode
-    if (this.gestureEngine) this.gestureEngine.setMode('GAMEPLAY');
+    // 3. Set gesture recognition to gameplay action mode and set correct weapon type mapping
+    if (this.gestureEngine) {
+      this.gestureEngine.setMode('GAMEPLAY');
+      
+      const currentWeaponId = this.uiManager ? this.uiManager.currentWeapon : 'pistol';
+      const config = WeaponConfig[currentWeaponId];
+      if (config) {
+        this.gestureEngine.setWeaponMode(config.category);
+      } else {
+        this.gestureEngine.setWeaponMode('all');
+      }
+    }
 
     // 4. Auto-initialize camera stream for gameplay if tracking is inactive
     if (this.gestureTestWindow && !this.gestureTestWindow.cameraStream) {

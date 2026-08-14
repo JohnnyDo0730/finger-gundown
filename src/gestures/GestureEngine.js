@@ -18,7 +18,7 @@ export class GestureEngine {
 
       // --- RIGHT HAND RANGED (WEAPON) ---
       thumbUpThreshold: 0.025,   // Thumbs-up detection threshold
-      triggerThreshold: 0.065,   // Firing trigger distance threshold
+      triggerThreshold: 0.085,   // Firing trigger distance threshold (increased to prevent accidental firing)
 
       // --- RIGHT HAND MELEE (SWORD) ---
       slashSpeedThreshold: 1.8,  // Velocity threshold for sword swings
@@ -70,6 +70,10 @@ export class GestureEngine {
     // Each entry: { x, y, t } — world-normalized coordinates + timestamp
     this.slashHistory = [];
     this.lastSlashTime = 0;
+
+    // Smoothed right hand tracking coordinates (to filter out MediaPipe jitter globally)
+    this.smoothedRightThumb = { x: 0.5, y: 0.5 };
+    this.smoothedRightThumbInitialized = false;
   }
 
   /**
@@ -182,8 +186,21 @@ export class GestureEngine {
 
     // 2. Process Right Hand
     if (rightHand) {
+      const thumbTip = rightHand[4];
+      if (thumbTip) {
+        if (!this.smoothedRightThumbInitialized) {
+          this.smoothedRightThumb.x = thumbTip.x;
+          this.smoothedRightThumb.y = thumbTip.y;
+          this.smoothedRightThumbInitialized = true;
+        } else {
+          // Snappy exponential filter (0.35 smoothing factor) to eliminate high frequency tremor with low latency
+          this.smoothedRightThumb.x += (thumbTip.x - this.smoothedRightThumb.x) * 0.35;
+          this.smoothedRightThumb.y += (thumbTip.y - this.smoothedRightThumb.y) * 0.35;
+        }
+      }
       this.evaluateRightHandWeapons(rightHand, timestamp);
     } else {
+      this.smoothedRightThumbInitialized = false;
       // Reset reload/skill tracking states when hand is lost
       this.chargeStarts.reload = 0;
       this.isReloadStateActive = false;
@@ -193,6 +210,13 @@ export class GestureEngine {
       this.emit('ON_AIM', { active: false });
       this.emit('ON_FIRE', { active: false });
     }
+  }
+
+  /**
+   * Return the smoothed right hand thumb coordinates for global cursor tracking.
+   */
+  getSmoothedCursorCoords() {
+    return this.smoothedRightThumb;
   }
 
   /**
@@ -548,25 +572,31 @@ export class GestureEngine {
 
       // --- 2. RANGED GESTURES (AIM & FIRE) - ALLOWED IN BOTH RANGED AND MELEE MODES ---
       if (allowRangedAimFire) {
+        /*
+        // 【歷史遺留手勢】舉手比槍與食指扣扳機判定邏輯 (已註解，改為 Hover 瞄準與 Pinch 捏合射擊)
         const isMiddleCurled = getDistance(middleTip, wrist) < getDistance(middlePip, wrist) * 1.35;
         const isRingCurled = getDistance(ringTip, wrist) < getDistance(ringPip, wrist) * 1.35;
         const isPinkyCurled = getDistance(pinkyTip, wrist) < getDistance(pinkyPip, wrist) * 1.40;
-
         const isThumbUp = (thumbBase.y - thumbTip.y) > this.config.thumbUpThreshold;
         const isWeaponBaseActive = isMiddleCurled && isRingCurled && isPinkyCurled && isThumbUp;
+        const xDiff = Math.abs(indexTip.x - indexKnuckle.x);
+        const isTriggerPulled = xDiff >= this.config.triggerThreshold;
+        */
 
-        if (isWeaponBaseActive) {
-          const xDiff = Math.abs(indexTip.x - indexKnuckle.x);
+        // Pinch to shoot (thumb and index touch)
+        const dist = getDistance(thumbTip, indexTip);
+        const isPinching = dist < 0.035;
 
-          if (xDiff < this.config.triggerThreshold) {
-            this.emit('ON_AIM', { active: true, wristX: wrist.x, wristY: wrist.y });
-            this.emit('ON_FIRE', { active: false });
-          } else {
-            this.emit('ON_AIM', { active: false });
-            this.emit('ON_FIRE', { active: true, force: xDiff });
-          }
+        // Emit ON_AIM with the globally smoothed coordinates
+        this.emit('ON_AIM', { 
+          active: true, 
+          wristX: this.smoothedRightThumb.x, 
+          wristY: this.smoothedRightThumb.y 
+        });
+
+        if (isPinching) {
+          this.emit('ON_FIRE', { active: true, force: 1.0 });
         } else {
-          this.emit('ON_AIM', { active: false });
           this.emit('ON_FIRE', { active: false });
         }
       } else {

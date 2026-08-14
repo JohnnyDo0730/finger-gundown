@@ -1,0 +1,10 @@
+{
+  "files.watcherExclude": {
+    "**/dist_electron/**": true,
+    "**/dist/**": true,
+    "**/node_modules/**": true
+  },
+  "files.exclude": {
+    "**/dist_electron": true
+  }
+}

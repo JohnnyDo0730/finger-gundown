@@ -393,7 +393,7 @@ export class MenuManager {
       .menu-btn-list {
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: 28px; /* Increased vertical spacing between buttons */
         align-items: center;
       }
       
@@ -406,7 +406,7 @@ export class MenuManager {
         font-family: 'Rajdhani', 'Inter', system-ui, sans-serif;
         font-weight: 600;
         font-size: 1.05rem;
-        padding: 16px 24px;
+        padding: 20px 24px; /* Increased button height */
         width: 320px;
         cursor: pointer;
         outline: none;
@@ -517,12 +517,12 @@ export class MenuManager {
         transition: opacity 0.4s ease-in-out 0.15s;
       }
       .weapons-panel-wrapper button.bottom-panel {
-        bottom: 20px;
+        bottom: 5px; /* Extended downwards closer to screen edge */
         left: 50%;
         transform: translateX(-50%) translateY(100px);
         opacity: 0;
         width: 620px;
-        height: 60px;
+        height: 75px; /* Increased exit button height */
         z-index: 90;
         background: var(--glass-surface);
         border: 1px solid var(--glass-border);
@@ -1046,11 +1046,11 @@ export class MenuManager {
       btnPlay.addEventListener('click', () => {
         // Check if hand tracking is already active (cameraStream exists)
         const isTrackingActive = this.app.gestureTestWindow && this.app.gestureTestWindow.cameraStream;
-        
+
         if (!isTrackingActive && this.app.gestureTestWindow) {
           // 1. Show the loading screen first
           this.showGestureLoadingOverlay(true, '正在啟動遊戲相機與手勢引擎...', '首次啟動需要數秒時間載入，載入後將自動開始遊戲。');
-          
+
           // 2. Start MediaPipe initialization
           this.app.gestureTestWindow.initMediaPipe()
             .then(() => {
@@ -1319,7 +1319,7 @@ export class MenuManager {
             this.menuPanelEl.classList.add('hidden');
             this.pausePanelEl.classList.add('hidden');
             this.weaponsPanelEl.classList.add('hidden');
-            
+
             // Reset inline styles
             this.overlayEl.style.opacity = '';
             this.overlayEl.style.transition = '';
@@ -1525,11 +1525,14 @@ export class MenuManager {
     const isMouseActive = (Date.now() - this.lastMouseMoveTime) < mouseActiveThreshold;
 
     if (isMouseActive || !isUIState || cursorX === undefined || cursorY === undefined) {
-      if (this.cursorEl) this.cursorEl.classList.remove('active');
+      if (this.cursorEl) {
+        this.cursorEl.classList.remove('active');
+        this.cursorEl.style.display = 'none';
+      }
       return;
     }
 
-    // Freeze coordinates if a pinch is starting or active to prevent index finger tip drift
+    // Freeze coordinates if a pinch is starting or active to prevent thumb coordinate drift
     if (isPinchStarting && this.lastGestureX !== undefined && this.lastGestureY !== undefined) {
       cursorX = this.lastGestureX;
       cursorY = this.lastGestureY;
@@ -1645,7 +1648,7 @@ export class MenuManager {
    */
   resumeGameWithTransition() {
     if (!this.pausePanelEl) return;
-    
+
     // 1. Fade out overlay backdrop
     this.overlayEl.style.transition = 'opacity 0.4s ease';
     this.overlayEl.style.opacity = '0';
@@ -1762,7 +1765,7 @@ export class MenuManager {
     setTimeout(() => {
       this.app.stateManager.transitionTo('PLAYING');
       ripple.style.opacity = '0';
-      
+
       setTimeout(() => {
         if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
         this.menuPanelEl.style.transform = '';
@@ -1793,7 +1796,7 @@ export class MenuManager {
       loadingOverlay.querySelector('.gesture-loading-text').textContent = text;
       loadingOverlay.querySelector('.gesture-loading-subtext').textContent = subtext;
     }
-    
+
     if (show) {
       loadingOverlay.classList.add('active');
     } else {
