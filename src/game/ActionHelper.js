@@ -19,8 +19,14 @@ export class ActionHelper {
   /**
    * Spawn a straight flying linear projectile (e.g. laser, gun shot, grenade).
    */
-  spawnLinear(position, direction, speed, damage, duration, color = 0x00f2fe, size = 0.3) {
-    const geo = new THREE.SphereGeometry(size, 8, 8);
+  spawnLinear(position, direction, speed, damage, duration, color = 0x00f2fe, size = 0.3, shape = 'sphere') {
+    let geo;
+    if (shape === 'cylinder') {
+      geo = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 4.0, 8);
+      geo.rotateX(Math.PI / 2); // Rotate to point along Z-axis
+    } else {
+      geo = new THREE.SphereGeometry(size, 8, 8);
+    }
     const mat = new THREE.MeshBasicMaterial({
       color: color,
       transparent: true,
@@ -28,6 +34,7 @@ export class ActionHelper {
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(position);
+    mesh.lookAt(position.clone().add(direction)); // Align cylinder to fly direction
     this.scene.add(mesh);
 
     const velocity = direction.clone().normalize().multiplyScalar(speed);
@@ -45,9 +52,44 @@ export class ActionHelper {
   }
 
   /**
+   * Spawn a stationary laser cylinder beam towards crosshair.
+   */
+  spawnStationaryBeam(position, direction, length, radius, damage, duration, color = 0xff0000, tickInterval = 5.0) {
+    const geo = new THREE.CylinderGeometry(radius, radius, length, 8);
+    geo.rotateX(Math.PI / 2); // Point forward along Z-axis
+    const mat = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.8
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+
+    // Center of cylinder is half length forward
+    const center = position.clone().addScaledVector(direction, length / 2);
+    mesh.position.copy(center);
+    mesh.lookAt(position.clone().addScaledVector(direction, length));
+
+    this.scene.add(mesh);
+
+    this.projectiles.push({
+      mesh,
+      type: 'stationary_beam',
+      startPoint: position.clone(),
+      direction: direction.clone().normalize(),
+      length,
+      radius,
+      damage,
+      duration,
+      tickInterval, // Passed from config (e.g. 5.0s to ensure single hit within beam lifetime)
+      lastTickTime: -99.0,
+      elapsed: 0
+    });
+  }
+
+  /**
    * Spawn a homing tracking projectile that steers towards targets.
    */
-  spawnHoming(position, speed, damage, targetEnemy, duration, color = 0xff007f, size = 0.4) {
+  spawnHoming(position, speed, damage, targetEnemy, duration, color = 0xff007f, size = 0.4, fallbackDirection = null) {
     const geo = new THREE.ConeGeometry(size, size * 2.5, 8);
     geo.rotateX(Math.PI / 2); // Point cone forward
     const mat = new THREE.MeshBasicMaterial({
@@ -57,6 +99,14 @@ export class ActionHelper {
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(position);
+
+    // Face targeting direction immediately upon spawn
+    if (targetEnemy) {
+      mesh.lookAt(targetEnemy.mesh.position.clone().add(new THREE.Vector3(0, targetEnemy.height / 2, 0)));
+    } else if (fallbackDirection) {
+      mesh.lookAt(position.clone().add(fallbackDirection));
+    }
+
     this.scene.add(mesh);
 
     this.projectiles.push({
@@ -65,6 +115,7 @@ export class ActionHelper {
       speed,
       damage,
       targetEnemy,
+      fallbackDirection: fallbackDirection ? fallbackDirection.clone().normalize() : new THREE.Vector3(0, 0, -1),
       duration,
       elapsed: 0,
       knockbackStrength: 10.0
@@ -93,7 +144,7 @@ export class ActionHelper {
     // 2. Central floor marker grid
     const markerGeo = new THREE.BoxGeometry(radius * 1.4, 0.02, 0.1);
     const markerMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5 });
-    
+
     const m1 = new THREE.Mesh(markerGeo, markerMat);
     const m2 = m1.clone();
     m2.rotation.y = Math.PI / 2;
@@ -119,23 +170,53 @@ export class ActionHelper {
   /**
    * Search helper to find the closest living enemy target.
    */
-  findNearestEnemy(currentPos) {
+  findNearestEnemy(currentPos, aimDirection = null) {
     if (!this.gameWorld.enemyManager) return null;
     const aliveEnemies = this.gameWorld.enemyManager.getAliveEnemies();
     if (aliveEnemies.length === 0) return null;
 
-    let nearest = null;
-    let minDist = Infinity;
+    const maxDistance = 60.0; // Constraint 2: enemies cannot be too far (max 60 units)
+    const candidateEnemies = [];
 
     aliveEnemies.forEach(enemy => {
-      const dist = enemy.mesh.position.distanceTo(currentPos);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = enemy;
+      const toEnemy = enemy.mesh.position.clone().sub(currentPos);
+      const dist = toEnemy.length();
+
+      // Filter: Distance constraint
+      if (dist > maxDistance) return;
+
+      let dot = 1.0;
+      if (aimDirection) {
+        const normDir = toEnemy.clone().setY(0).normalize();
+        const normAim = aimDirection.clone().setY(0).normalize();
+        if (normDir.lengthSq() > 0 && normAim.lengthSq() > 0) {
+          dot = normAim.dot(normDir);
+          // Filter: Angle constraint (35 degrees corresponds to dot product >= 0.8192)
+          if (dot < 0.866) return;
+        } else {
+          return; // Invalid vectors, filter out
+        }
       }
+
+      candidateEnemies.push({
+        enemy,
+        dist,
+        dot
+      });
     });
 
-    return nearest;
+    if (candidateEnemies.length === 0) return null;
+
+    // Sort by priorities: closest distance, then smaller angle (larger dot product)
+    candidateEnemies.sort((a, b) => {
+      // If distance difference is small (within 3.0 units), prioritize angle alignment
+      if (Math.abs(a.dist - b.dist) < 3.0) {
+        return b.dot - a.dot; // Larger dot product (smaller angle) comes first
+      }
+      return a.dist - b.dist; // Closer distance comes first
+    });
+
+    return candidateEnemies[0].enemy;
   }
 
   /**
@@ -185,7 +266,7 @@ export class ActionHelper {
       } else if (proj.type === 'homing') {
         // Target tracking validation
         if (!proj.targetEnemy || !proj.targetEnemy.isAlive) {
-          proj.targetEnemy = this.findNearestEnemy(proj.mesh.position);
+          proj.targetEnemy = this.findNearestEnemy(proj.mesh.position, proj.fallbackDirection);
         }
 
         if (proj.targetEnemy) {
@@ -194,10 +275,10 @@ export class ActionHelper {
             new THREE.Vector3(0, proj.targetEnemy.height / 2, 0)
           );
           const dir = targetCenter.sub(proj.mesh.position).normalize();
-          
+
           // Steer towards target
           proj.mesh.position.addScaledVector(dir, proj.speed * deltaTime);
-          proj.mesh.lookAt(proj.targetEnemy.mesh.position.clone().add(new THREE.Vector3(0, proj.targetEnemy.height/2, 0)));
+          proj.mesh.lookAt(proj.targetEnemy.mesh.position.clone().add(new THREE.Vector3(0, proj.targetEnemy.height / 2, 0)));
 
           // Check hit
           const projBox = new THREE.Box3().setFromObject(proj.mesh);
@@ -207,9 +288,10 @@ export class ActionHelper {
             proj.elapsed = proj.duration; // Queue for disposal next tick
           }
         } else {
-          // If no enemy exists, fly straight as fallback
-          const forward = new THREE.Vector3(0, 0, 1);
-          proj.mesh.position.addScaledVector(forward, proj.speed * deltaTime);
+          // If no enemy exists, fly straight along fallback direction
+          const dir = proj.fallbackDirection;
+          proj.mesh.position.addScaledVector(dir, proj.speed * deltaTime);
+          proj.mesh.lookAt(proj.mesh.position.clone().add(dir));
         }
 
       } else if (proj.type === 'stationary') {
@@ -231,6 +313,30 @@ export class ActionHelper {
             if (dist <= proj.radius + enemy.width / 2) {
               const radialKnockback = enemy.mesh.position.clone().sub(projPos).setY(0).normalize().multiplyScalar(2.5);
               enemy.takeDamage(proj.damage, radialKnockback);
+            }
+          });
+        }
+      } else if (proj.type === 'stationary_beam') {
+        // No deformation animation, just tick-based damage checks
+        if (proj.elapsed - proj.lastTickTime >= proj.tickInterval) {
+          proj.lastTickTime = proj.elapsed;
+
+          const A = proj.startPoint;
+          const v = proj.direction.clone().multiplyScalar(proj.length);
+
+          aliveEnemies.forEach(enemy => {
+            const P = enemy.mesh.position.clone().setY(0);
+            const A_flat = A.clone().setY(0);
+            const v_flat = v.clone().setY(0);
+
+            const w = P.clone().sub(A_flat);
+            const t = Math.max(0, Math.min(1, w.dot(v_flat) / v_flat.lengthSq()));
+            const C = A_flat.clone().addScaledVector(v_flat, t);
+            const dist = P.distanceTo(C);
+
+            if (dist <= proj.radius + enemy.width / 2) {
+              const knockback = proj.direction.clone().setY(0).normalize().multiplyScalar(3.0);
+              enemy.takeDamage(proj.damage, knockback);
             }
           });
         }

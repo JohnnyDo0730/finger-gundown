@@ -16,14 +16,15 @@ export class PistolWeapon extends BaseWeapon {
 
     const { startPoint, direction } = context;
     if (context.actionHelper) {
-      context.actionHelper.spawnLinear(
+      context.actionHelper.spawnStationaryBeam(
         startPoint,
         direction,
-        actionConfig.speed,
+        actionConfig.beamLength,        // From config: 25.0
+        actionConfig.beamRadius,        // From config: 0.1
         actionConfig.damage,
-        3.0, // projectile lifespan
+        actionConfig.duration / 1000,   // From config: 300ms -> 0.3s
         actionConfig.color,
-        actionConfig.size
+        actionConfig.tickInterval / 1000 // From config: 5000ms -> 5.0s (single-hit guarantee)
       );
     }
 

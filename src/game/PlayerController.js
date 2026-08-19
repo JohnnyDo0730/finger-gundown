@@ -44,6 +44,8 @@ export class PlayerController {
     // Aiming & scoping states
     this.screenX = window.innerWidth / 2;
     this.screenY = window.innerHeight / 2;
+    this.handX = window.innerWidth / 2;
+    this.handY = window.innerHeight / 2;
     this.isZoomed = false;
     this.currentFov = 75;
     this.targetFov = 75;
@@ -51,6 +53,18 @@ export class PlayerController {
     // Semi-automatic trigger safety locking
     this.isShootPressed = false;
     this.isSkillPressed = false;
+    this.isAimFiring = false;
+
+    // Scoping camera: Unity-style absolute center-anchored offsets
+    this.aimCenterYaw = 0;     // World yaw locked at scope entry moment
+    this.aimYawOffset = 0;     // Relative yaw offset from center
+    this.aimPitchOffset = 0;   // Relative pitch offset from center
+    this.aimMaxYaw = 60;       // Max horizontal degrees from center
+    this.aimMaxPitch = 30;     // Max vertical degrees from center
+    this.baseFov = 75;         // Reference FOV for sensitivity scaling
+    // ↓ TUNE HERE: minimum sensitivity floor at max zoom (0.0 = full FPS lock, 1.0 = no reduction)
+    // At 0.6, even 6x zoom retains 60% hand travel range — good for casual gesture play
+    this.aimSensFloor = 0.6;   // Min ratio of sensitivity retained at max zoom
 
     this.equippedWeapon = null;
     this.lastDeltaTime = 0.016;
@@ -95,7 +109,9 @@ export class PlayerController {
 
   getContext() {
     const targetPoint = this.get3DTargetPoint();
-    const startPoint = this.position.clone().add(new THREE.Vector3(0, -0.4, -0.5));
+    const totalYaw = this.yaw + this.aimYawOffset;
+    const offset = new THREE.Vector3(0, -0.4, -0.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), totalYaw);
+    const startPoint = this.position.clone().add(offset);
     const direction = targetPoint.clone().sub(startPoint).normalize();
 
     return {
@@ -110,7 +126,7 @@ export class PlayerController {
 
   init() {
     console.log('[PlayerController] Initializing movement and triggers...');
-    
+
     // Equip selected weapon
     const weaponKey = localStorage.getItem('gesture_selected_weapon') || 'pistol';
     this.equipWeapon(weaponKey);
@@ -124,14 +140,39 @@ export class PlayerController {
 
       this.app.gestureEngine.addEventListener('ON_AIM', (data) => {
         if (data.active) {
-          // Map normalized gesture tracking points to screen coordinates
-          this.screenX = data.wristX * window.innerWidth;
-          this.screenY = data.wristY * window.innerHeight;
+          // Always track raw hand coordinates
+          this.handX = data.wristX * window.innerWidth;
+          this.handY = data.wristY * window.innerHeight;
+
+          if (!this.isZoomed) {
+            this.screenX = this.handX;
+            this.screenY = this.handY;
+          } else {
+            // Lock crosshair to exact window center when scoping
+            this.screenX = window.innerWidth / 2;
+            this.screenY = window.innerHeight / 2;
+          }
         }
       });
 
       this.app.gestureEngine.addEventListener('ON_SYNC_AIM', (data) => {
         this.isZoomed = data.active;
+        if (data.active) {
+          // Capture the absolute world yaw at scope entry (ResetAimCenter equivalent)
+          this.aimCenterYaw = this.yaw;
+          this.aimYawOffset = 0;
+          this.aimPitchOffset = 0;
+          this.screenX = window.innerWidth / 2;
+          this.screenY = window.innerHeight / 2;
+        } else {
+          // Absorb the offset back into base yaw so camera doesn't snap on exit
+          this.yaw = this.aimCenterYaw + this.aimYawOffset;
+          this.aimCenterYaw = 0;
+          this.aimYawOffset = 0;
+          this.aimPitchOffset = 0;
+          this.screenX = this.handX || window.innerWidth / 2;
+          this.screenY = this.handY || window.innerHeight / 2;
+        }
         if (this.equippedWeapon) {
           this.equippedWeapon.onAction('aim', { zoom: data.zoom, active: data.active });
         } else {
@@ -140,6 +181,7 @@ export class PlayerController {
       });
 
       this.app.gestureEngine.addEventListener('ON_FIRE', (data) => {
+        this.isAimFiring = data.active;
         if (data.active) {
           if (!this.isShootPressed) {
             if (this.equippedWeapon) {
@@ -198,7 +240,7 @@ export class PlayerController {
       -(this.screenY / window.innerHeight) * 2 + 1
     );
     raycaster.setFromCamera(ndc, this.camera);
-    
+
     // Intersect plane at Z = 15 relative to starting plane, or forward target zone
     const targetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -10);
     const targetPoint = new THREE.Vector3();
@@ -234,10 +276,11 @@ export class PlayerController {
       steeringInput = Math.sign(steeringInput) * ((Math.abs(steeringInput) - deadzone) / (1 - deadzone));
     }
     const steeringCurve = Math.pow(steeringInput, 3);
-    
+
     // Reverse steering direction to turn left on left tilt (negative moveX) and right on right tilt (positive moveX)
     this.yaw -= steeringCurve * this.rotationSpeed * deltaTime;
 
+    // Apply steering vector to position
     const direction = new THREE.Vector3(0, 0, -1);
     direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
     direction.multiplyScalar(this.currentSpeed * deltaTime);
@@ -247,7 +290,50 @@ export class PlayerController {
     this.position.x = Math.max(this.boundaryMin, Math.min(this.boundaryMax, this.position.x));
     this.position.z = Math.max(this.boundaryMin, Math.min(this.boundaryMax, this.position.z));
 
+    // Unity-style absolute scoping camera offsets
+    if (this.isZoomed) {
+      // Raw FOV ratio: 1.0 at 1x zoom, ~0.17 at 6x zoom
+      const fovRatio = this.currentFov / this.baseFov;
+
+      // Dynamic sensitivity floor: instead of hard-scaling by raw FOV ratio,
+      // lerp between the floor and 1.0. This keeps gesture feel alive at high zoom.
+      // TUNE: this.aimSensFloor (line ~66 in constructor) — 0.6 recommended for gesture games
+      const dynamicRatio = this.aimSensFloor + (1.0 - this.aimSensFloor) * fovRatio;
+
+      // Apply dynamic ratio to max angular range
+      const effectiveMaxYaw = this.aimMaxYaw * dynamicRatio;
+      const effectiveMaxPitch = this.aimMaxPitch * dynamicRatio;
+
+      // Map absolute hand position to absolute offset angle relative to center
+      const normX = (this.handX - window.innerWidth / 2) / (window.innerWidth / 2);
+      const normY = (this.handY - window.innerHeight / 2) / (window.innerHeight / 2);
+
+      const targetYawOffset = -normX * effectiveMaxYaw * (Math.PI / 180);
+      const targetPitchOffset = -normY * effectiveMaxPitch * (Math.PI / 180); // inverted
+
+      // Clamp strictly to the angular boundary
+      const clampedYaw = Math.max(-effectiveMaxYaw * Math.PI / 180,
+        Math.min(effectiveMaxYaw * Math.PI / 180, targetYawOffset));
+      const clampedPitch = Math.max(-effectiveMaxPitch * Math.PI / 180,
+        Math.min(effectiveMaxPitch * Math.PI / 180, targetPitchOffset));
+
+      // Smooth lerp to target (cinematic feel, no snapping)
+      const lerpSpeed = 12.0;
+      this.aimYawOffset += (clampedYaw - this.aimYawOffset) * lerpSpeed * deltaTime;
+      this.aimPitchOffset += (clampedPitch - this.aimPitchOffset) * lerpSpeed * deltaTime;
+    } else {
+      // Smoothly restore offsets to 0 when exiting scope
+      const restoreSpeed = 10.0;
+      this.aimYawOffset += (0 - this.aimYawOffset) * restoreSpeed * deltaTime;
+      this.aimPitchOffset += (0 - this.aimPitchOffset) * restoreSpeed * deltaTime;
+    }
+
     this.syncCamera(deltaTime);
+
+    // Automatic weapon continuous firing tick
+    if (this.isAimFiring && this.equippedWeapon && this.equippedWeapon.isAutomatic) {
+      this.equippedWeapon.onAction('fire', this.getContext());
+    }
 
     // 2. Weapon timing ticks delegation
     if (this.equippedWeapon) {
@@ -258,7 +344,12 @@ export class PlayerController {
   syncCamera(deltaTime) {
     if (this.camera) {
       this.camera.position.copy(this.position);
-      this.camera.rotation.set(0, this.yaw, 0, 'YXZ');
+      // While scoped: pivot from the locked center yaw + relative offset
+      // While unscoped: plain yaw (aimCenterYaw=0, aimYawOffset lerps to 0)
+      const finalYaw = this.isZoomed
+        ? this.aimCenterYaw + this.aimYawOffset
+        : this.yaw + this.aimYawOffset;
+      this.camera.rotation.set(this.aimPitchOffset, finalYaw, 0, 'YXZ');
 
       // Smooth camera FOV transition (lerp)
       if (deltaTime) {

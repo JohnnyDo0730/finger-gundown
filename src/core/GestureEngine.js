@@ -84,6 +84,19 @@ export class GestureEngine {
     this.calib_yMax = parseFloat(localStorage.getItem('gesture_calib_yMax')) || 0.80;
   }
 
+  resetAllChargeStates() {
+    this.chargeStarts.pause = 0;
+    this.chargeStarts.reload = 0;
+    this.chargeStarts.skill = 0;
+    this.chargeStarts.ult = 0;
+
+    this.states.pause = false;
+    this.states.reload = false;
+    this.states.skill = false;
+    this.states.ult = false;
+    this.states.syncAim = false;
+  }
+
   /**
    * Set the active application mode.
    * @param {string} mode 'UI' | 'DEBUG' | 'GAMEPLAY'
@@ -91,6 +104,7 @@ export class GestureEngine {
   setMode(mode) {
     this.appMode = mode;
     console.log(`[GestureEngine] App Mode set to: ${mode}`);
+    this.resetAllChargeStates();
   }
 
   /**
@@ -100,6 +114,7 @@ export class GestureEngine {
   setWeaponMode(weaponKey) {
     this.weaponMode = weaponKey;
     console.log(`[GestureEngine] Weapon Mode set to: ${weaponKey}`);
+    this.resetAllChargeStates();
   }
 
   /**
@@ -308,8 +323,9 @@ export class GestureEngine {
           this.smoothedRightIndex.y = targetY;
           this.smoothedRightIndexInitialized = true;
         } else {
-          // If pinching, FREEZE coordinates completely to prevent drift!
-          if (!isPinching) {
+          // If pinching, FREEZE coordinates completely to prevent drift (UI mode only to allow aiming during gameplay fire)
+          const shouldFreeze = isPinching && this.appMode === 'UI';
+          if (!shouldFreeze) {
             this.smoothedRightIndex.x += (targetX - this.smoothedRightIndex.x) * 0.35;
             this.smoothedRightIndex.y += (targetY - this.smoothedRightIndex.y) * 0.35;
           }

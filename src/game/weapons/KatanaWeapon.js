@@ -7,7 +7,7 @@ export class KatanaWeapon extends BaseWeapon {
     const { startPoint, direction } = context;
     if (context.actionHelper) {
       // Find nearest enemy to track
-      const nearest = context.actionHelper.findNearestEnemy(startPoint);
+      const nearest = context.actionHelper.findNearestEnemy(startPoint, direction);
       context.actionHelper.spawnHoming(
         startPoint,
         actionConfig.speed,
@@ -15,7 +15,8 @@ export class KatanaWeapon extends BaseWeapon {
         nearest,
         3.0, // duration
         actionConfig.color,
-        actionConfig.size
+        actionConfig.size,
+        direction // Pass direction as fallback
       );
     }
     return true;

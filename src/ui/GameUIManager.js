@@ -135,7 +135,7 @@ export class GameUIManager {
           <div class="hud-heat-bg">
             <div class="hud-heat-fill" style="width: ${energyStyle.value}%; background: ${energyStyle.color}; box-shadow: 0 0 8px ${energyStyle.color};"></div>
           </div>
-          <span class="hud-heat-val" style="color: ${energyStyle.color};">${Math.floor(energyStyle.value)}%</span>
+          <span class="hud-heat-val" style="color: ${energyStyle.color};">${energyStyle.text || Math.floor(energyStyle.value) + '%'}</span>
         </div>
       `;
     }

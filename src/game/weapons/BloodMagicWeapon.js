@@ -6,7 +6,7 @@ export class BloodMagicWeapon extends BaseWeapon {
     const actionConfig = this.config.hiveActions.fire;
     const { startPoint, direction } = context;
     if (context.actionHelper) {
-      const nearest = context.actionHelper.findNearestEnemy(startPoint);
+      const nearest = context.actionHelper.findNearestEnemy(startPoint, direction);
       context.actionHelper.spawnHoming(
         startPoint,
         actionConfig.speed,
@@ -14,7 +14,8 @@ export class BloodMagicWeapon extends BaseWeapon {
         nearest,
         3.0,
         actionConfig.color,
-        actionConfig.size
+        actionConfig.size,
+        direction
       );
     }
     return true;

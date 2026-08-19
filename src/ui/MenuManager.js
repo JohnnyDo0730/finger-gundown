@@ -167,8 +167,9 @@ export class MenuManager {
       case 'PLAYING':
         // Transition out of any menu/UI view overlay smoothly
         if (this.currentView) {
-          await this.currentView.exit();
-          this.currentView = null;
+          const viewToExit = this.currentView;
+          this.currentView = null; // Clear active reference instantly to prevent async race conditions during rapid triggers
+          await viewToExit.exit();
         }
         this.overlayEl.classList.remove('active');
         // Delay removal of paused-mode class until the overlay opacity fade-out transition is completely finished (400ms)
