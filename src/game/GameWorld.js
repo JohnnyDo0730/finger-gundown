@@ -1,11 +1,11 @@
+const THREE = window.THREE;
 import { PlayerController } from './PlayerController.js';
 import { EnemyManager } from './EnemyManager.js';
-import { GunSystem } from './GunSystem.js';
-
-const THREE = window.THREE;
+import { ActionHelper } from './ActionHelper.js';
+import { GameUIManager } from '../ui/GameUIManager.js';
 
 /**
- * GameWorld - Central manager for Three.js 3D space, renderer, lights,
+ * GameWorld - Central orchestrator for the Three.js 3D space, renderer, lights,
  * combat arena grid floor, and updates.
  */
 export class GameWorld {
@@ -14,13 +14,12 @@ export class GameWorld {
    */
   constructor(app) {
     this.app = app;
-    this.isSimulationPaused = true; // Paused until explicitly entered PLAYING state
+    this.isSimulationPaused = true;
 
     // 3D Scene Core Setup
     this.scene = null;
     this.camera = null;
     this.renderer = null;
-    this.playerController = null;
     this.clock = null;
 
     // Lights references
@@ -28,26 +27,28 @@ export class GameWorld {
     this.dirLight = null;
     this.pointLight = null;
 
-    // Enemy system reference
+    // Controllers/Managers
+    this.playerController = null;
     this.enemyManager = null;
-    this.gunSystem = null;
+    this.actionHelper = null;
+    this.gameUIManager = null;
 
     this.init();
     window.gameWorld = this; // Expose globally for testing/verification
   }
 
   /**
-   * Initialize Three.js scene, camera, lights, mesh floor, and controllers.
+   * Initialize Three.js scene, camera, lights, floor, and managers.
    */
   init() {
     console.log('[GameWorld] Initializing 3D battle arena...');
 
     // 1. Create Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf1f3f5); // Soft neutral light gray-white (not blinding)
+    this.scene.background = new THREE.Color(0xf1f3f5); // Soft neutral light gray-white
     this.scene.fog = new THREE.FogExp2(0xf1f3f5, 0.008); // Horizon fog matching light gray background
 
-    // 2. Create Camera (FOV: 75, Near: 0.1, Far: 1000)
+    // 2. Create Camera
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -55,31 +56,29 @@ export class GameWorld {
       1000
     );
 
-    // 3. Create WebGL Renderer with transparency support
+    // 3. Create WebGL Renderer with transparency
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Standard positioning to slide WebGL canvas behind the dashboard overlays
+    // Standard positioning to slide WebGL canvas behind dashboard overlays
     this.renderer.domElement.id = 'game-canvas-3d';
     this.renderer.domElement.style.position = 'fixed';
     this.renderer.domElement.style.top = '0';
     this.renderer.domElement.style.left = '0';
     this.renderer.domElement.style.width = '100vw';
     this.renderer.domElement.style.height = '100vh';
-    this.renderer.domElement.style.zIndex = '0'; // Placed behind relative/absolute HUDs (z-index 10+)
-    this.renderer.domElement.style.pointerEvents = 'none'; // Allow clicks to fall through to DOM buttons if needed
+    this.renderer.domElement.style.zIndex = '0'; // Placed behind HUD overlays
+    this.renderer.domElement.style.pointerEvents = 'none'; // Clicks fall through to DOM buttons
 
     document.body.appendChild(this.renderer.domElement);
 
-    // 4. Setup Lighting for Bright White-Gray Blueprint Style
-    // Ambient light - Bright neutral ambient
+    // 4. Setup Lighting
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     this.scene.add(this.ambientLight);
 
-    // Directional light - Bright white main light
     this.dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
     this.dirLight.position.set(40, 80, 40);
     this.dirLight.castShadow = true;
@@ -88,7 +87,6 @@ export class GameWorld {
     this.dirLight.shadow.camera.near = 0.5;
     this.dirLight.shadow.camera.far = 250;
 
-    // Fit shadow camera frustum bounds to the 200x200 arena size
     const d = 110;
     this.dirLight.shadow.camera.left = -d;
     this.dirLight.shadow.camera.right = d;
@@ -96,16 +94,14 @@ export class GameWorld {
     this.dirLight.shadow.camera.bottom = -d;
     this.scene.add(this.dirLight);
 
-    // Point Light - Soft white secondary light
     this.pointLight = new THREE.PointLight(0xffffff, 0.3, 120);
     this.pointLight.position.set(-40, 40, -40);
     this.scene.add(this.pointLight);
 
-    // 5. Setup Arena Environment (200x200 floor grid, bounds: -100 to 100)
-    // Clean off-white floor mesh to receive shadows
+    // 5. Setup Arena Floor (200x200 Plane)
     const floorGeo = new THREE.PlaneGeometry(200, 200);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0xeaeaea, // Light gray/off-white floor
+      color: 0xeaeaea,
       roughness: 0.85,
       metalness: 0.05,
       side: THREE.DoubleSide
@@ -115,33 +111,30 @@ export class GameWorld {
     floor.receiveShadow = true;
     this.scene.add(floor);
 
-    // Grid helper overlay - Medium gray lines for grid visibility on light floor
-    // Divisions = 100 lines (every 2 units has a grid line)
+    // Grid helper overlay
     const gridHelper = new THREE.GridHelper(200, 100, 0x888888, 0xcccccc);
-    gridHelper.position.y = 0.01; // Avoid Z-fighting overlay artifacts
+    gridHelper.position.y = 0.01;
     this.scene.add(gridHelper);
 
-    // 6. Instantiate PlayerController Camera wrapper
-    this.playerController = new PlayerController(this.camera, this.app);
+    // 6. Instantiate ActionHelper
+    this.actionHelper = new ActionHelper(this.app, this);
+
+    // 7. Instantiate PlayerController Camera wrapper
+    this.playerController = new PlayerController(this.camera, this.app, this);
     this.app.cameraController = this.playerController; // Expose to App coordinator
 
-    // 7. Instantiate EnemyManager
+    // 8. Instantiate EnemyManager
     this.enemyManager = new EnemyManager(this.app, this);
 
-    // 8. Instantiate GunSystem
-    this.gunSystem = new GunSystem(this.app, this);
+    // 9. Instantiate GameUIManager
+    this.gameUIManager = new GameUIManager(this.app);
 
-    // 9. Setup clock tracker
     this.clock = new THREE.Clock();
 
-    // 8. Bind resize events
     this.resizeHandler = () => this.handleResize();
     window.addEventListener('resize', this.resizeHandler);
   }
 
-  /**
-   * Handle camera aspect ratio and renderer resizing.
-   */
   handleResize() {
     if (!this.camera || !this.renderer) return;
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -149,130 +142,84 @@ export class GameWorld {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  /**
-   * Transition state to resume simulation and physical updates.
-   */
   resumeSimulation() {
     this.isSimulationPaused = false;
-    // Consume clock delta to prevent massive movements caused by paused tab timeouts
     if (this.clock) {
-      this.clock.getDelta();
+      this.clock.getDelta(); // Consume time gap
+    }
+    if (this.gameUIManager) {
+      this.gameUIManager.show(true);
     }
     console.log('[GameWorld] Simulation resumed.');
   }
 
-  /**
-   * Transition state to freeze movement but maintain visual render updates.
-   */
   pauseSimulation() {
     this.isSimulationPaused = true;
+    if (this.gameUIManager) {
+      this.gameUIManager.show(false);
+    }
     console.log('[GameWorld] Simulation paused.');
   }
 
-  /**
-   * Main game tick. Updates controllers and renders active scene.
-   * @param {number} timestamp - Total elapsed time.
-   */
   update(timestamp) {
     if (!this.clock || !this.renderer) return;
 
-    // Get time elapsed since last tick (seconds)
     let deltaTime = this.clock.getDelta();
-
-    // Clamp delta time to avoid coordinate explosion during performance drops
     if (deltaTime > 0.1) {
       deltaTime = 0.1;
     }
 
-    // 1. Run physical gameplay changes (player positioning, enemies, etc.) if unpaused
     if (!this.isSimulationPaused) {
-      if (this.playerController) {
-        this.playerController.update(deltaTime);
-      }
-      if (this.enemyManager) {
-        this.enemyManager.update(deltaTime);
-      }
-      if (this.gunSystem) {
-        this.gunSystem.update(deltaTime);
-      }
+      if (this.playerController) this.playerController.update(deltaTime);
+      if (this.enemyManager) this.enemyManager.update(deltaTime);
+      if (this.actionHelper) this.actionHelper.update(deltaTime);
+      if (this.gameUIManager) this.gameUIManager.update(deltaTime, this.playerController);
     }
 
-    // 2. Render current WebGL viewport frame (runs constantly in background to keep screen fluid)
     this.renderer.render(this.scene, this.camera);
   }
 
-  /**
-   * Reset game state to start a clean new match.
-   */
   reset() {
     console.log('[GameWorld] Resetting game world state...');
     
-    // 1. Reset player position and rotation
     if (this.playerController) {
-      this.playerController.position.set(0, 1.6, 30);
-      this.playerController.yaw = 0;
-      this.playerController.currentSpeed = 0;
-      this.playerController.moveX = 0;
-      this.playerController.moveY = 0;
-      // Sync camera pos
-      this.playerController.camera.position.copy(this.playerController.position);
-      this.playerController.camera.rotation.set(0, 0, 0);
+      this.playerController.reset();
     }
 
-    // 2. Reset enemies (clear and seed again)
     if (this.enemyManager) {
       this.enemyManager.clearAll();
-      this.enemyManager.enemies = [];
       this.enemyManager.enemyIdCounter = 0;
-      this.enemyManager.init(); // Reseeds the row of 5 dummies
+      this.enemyManager.init();
     }
 
-    // 3. Reset weapons / gun system
-    if (this.gunSystem) {
-      // Clear bullets
-      this.gunSystem.bullets.forEach((bullet) => {
-        this.scene.remove(bullet.mesh);
-        if (bullet.mesh.geometry) bullet.mesh.geometry.dispose();
-        if (bullet.mesh.material) bullet.mesh.material.dispose();
-      });
-      this.gunSystem.bullets = [];
-      
-      // Reset ammo, heat, reload status
-      this.gunSystem.ammo = 12;
-      this.gunSystem.maxAmmo = 12;
-      this.gunSystem.isReloading = false;
-      this.gunSystem.reloadTimer = 0.0;
-      this.gunSystem.shootCooldownTimer = 0.0;
-      this.gunSystem.heat = 0.0;
-      this.gunSystem.isOverheated = false;
-      this.gunSystem.overheatTimer = 0.0;
-      this.gunSystem.updateHUDUI();
+    if (this.actionHelper) {
+      this.actionHelper.clearAll();
     }
   }
 
-  /**
-   * Dispose WebGL context and remove mounted elements.
-   */
   destroy() {
     console.log('[GameWorld] Tearing down 3D environment...');
     
-    // Clear and dispose all active targets
     if (this.enemyManager) {
       this.enemyManager.clearAll();
     }
 
-    // Clear and dispose weapon system
-    if (this.gunSystem) {
-      this.gunSystem.destroy();
+    if (this.actionHelper) {
+      this.actionHelper.clearAll();
+    }
+
+    if (this.gameUIManager) {
+      this.gameUIManager.destroy();
     }
 
     window.removeEventListener('resize', this.resizeHandler);
 
     if (this.renderer && this.renderer.domElement) {
-      this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+      if (this.renderer.domElement.parentNode) {
+        this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+      }
     }
 
-    // Traverse scene to dispose geometries and materials
     this.scene.traverse((object) => {
       if (object.geometry) object.geometry.dispose();
       if (object.material) {

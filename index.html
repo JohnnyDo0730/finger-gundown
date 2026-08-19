@@ -5,94 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Finger Gundown - Hand Gesture Controller</title>
   <link rel="stylesheet" href="./src/ui/style.css">
+  <link rel="stylesheet" href="./src/ui/gameplay.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-
-  <div class="dashboard hidden" id="main-dashboard">
-    <header>
-      <h1>Finger Gundown</h1>
-      <p>3D Web VR Game Powered by Three.js & MediaPipe</p>
-    </header>
-
-    <main class="main-content">
-      <!-- Left side: State Status and Controller -->
-      <div class="section">
-        <h2 class="section-title">State Controller</h2>
-        
-        <div class="status-panel">
-          <div class="status-label">CURRENT SYSTEM STATE</div>
-          <div id="current-state-display" class="state-badge state-menu">MENU</div>
-        </div>
-
-        <div class="control-list">
-          <button id="btn-state-menu" class="control-btn active">
-            <span>MENU</span>
-          </button>
-          <button id="btn-state-test" class="control-btn">
-            <span>TEST_MODE</span>
-          </button>
-          <button id="btn-state-playing" class="control-btn">
-            <span>PLAYING</span>
-          </button>
-          <button id="btn-state-paused" class="control-btn">
-            <span>PAUSED</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Right side: Roadmap / Phases Tracker -->
-      <div class="section">
-        <h2 class="section-title">Development Timeline</h2>
-        
-        <div class="stage-timeline">
-          <div class="stage-item current">
-            <div class="stage-dot">01</div>
-            <div class="stage-detail">
-              <div class="stage-name">Phase 1: Architecture Sync</div>
-              <div class="stage-desc">Module structure design & core state machine setup.</div>
-            </div>
-          </div>
-
-          <div class="stage-item">
-            <div class="stage-dot">02</div>
-            <div class="stage-detail">
-              <div class="stage-name">Phase 2: Gesture Test Window</div>
-              <div class="stage-desc">Camera input, landmarks visualization & tracking debug.</div>
-            </div>
-          </div>
-
-          <div class="stage-item">
-            <div class="stage-dot">03</div>
-            <div class="stage-detail">
-              <div class="stage-name">Phase 3: UI State Machine</div>
-              <div class="stage-desc">Main / pause menus & weapon loadout selector interface.</div>
-            </div>
-          </div>
-
-          <div class="stage-item">
-            <div class="stage-dot">04</div>
-            <div class="stage-detail">
-              <div class="stage-name">Phase 4: Gesture Engine</div>
-              <div class="stage-desc">Core custom gesture recognition algorithms.</div>
-            </div>
-          </div>
-
-          <div class="stage-item">
-            <div class="stage-dot">05</div>
-            <div class="stage-detail">
-              <div class="stage-name">Phase 5: 3D Scene Integration</div>
-              <div class="stage-desc">Three.js renderer, weapon controllers & gameplay loops.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <footer class="footer-credits">
-      Designed for Next-Gen Browser Gaming • Powered by ES6 Modules
-    </footer>
-  </div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

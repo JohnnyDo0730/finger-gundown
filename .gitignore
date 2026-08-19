@@ -38,5 +38,6 @@ dist-ssr
 dist_electron/
 
 
-# test_data
+# local
 test_data/
+old_src/
