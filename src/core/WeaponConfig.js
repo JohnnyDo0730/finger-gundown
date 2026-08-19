@@ -17,7 +17,7 @@ export const ActionConfig = {
     name: '暫停遊戲',
     category: 'basic',
     description: '開啟或關閉系統暫停選單。',
-    chargeTime: 1000,
+    chargeTime: 1500,
     animationTime: 0
   },
   'right-cursor': {
@@ -150,42 +150,44 @@ export const WeaponConfig = {
       reloadOverheatTime: 4.0
     },
     hiveActions: {
-      'fire': { 
-        name: '熱能光束', 
-        active: true, 
+      'fire': {
+        name: '熱能光束',
+        active: true,
         desc: '單點發射高能熱磁雷射，具備穿透路徑上所有敵人的電磁效能，每次發射會累積 {heatPerShot}% 熱能，冷卻 {cooldown} 秒。',
         cooldown: 450,
         damage: 25,
-        type: 'linear',
-        speed: 50.0,
-        color: 0x00f2fe,
-        size: 0.25,
+        type: 'stationary_beam',
+        beamLength: 60.0,
+        beamRadius: 0.1,
+        duration: 300,
+        tickInterval: 5000,  // 5s interval: guarantees exactly one hit during 0.3s beam lifetime
+        color: 0xff0000,
         heatPerShot: 20.0
       },
-      'reload': { 
-        name: '過載冷卻', 
-        active: true, 
+      'reload': {
+        name: '過載冷卻',
+        active: true,
         desc: '主動開啟散熱閥，在 {duration} 秒裝填時間內快速排出核心熱能並重置過載。',
         duration: 2000,
         chargeTime: 500,
         animationTime: 2000
       },
-      'aim': { 
-        name: '紅點瞄準鏡', 
-        active: true, 
+      'aim': {
+        name: '紅點瞄準鏡',
+        active: true,
         desc: '啟動戰術紅點反射鏡，提供 {minZoom}x 至 {maxZoom}x 微幅輔助瞄準。',
         minZoom: 1.0,
         maxZoom: 1.2,
         defaultZoom: 1.1
       },
-      'slash': { 
-        name: '揮舞', 
-        active: false, 
-        desc: '此槍械武器不支援近戰揮舞。' 
+      'slash': {
+        name: '揮舞',
+        active: false,
+        desc: '此槍械武器不支援近戰揮舞。'
       },
-      'skill': { 
-        name: '手榴彈', 
-        active: true, 
+      'skill': {
+        name: '手榴彈',
+        active: true,
         desc: '軍人必備！蓄力 {chargeTime} 秒拋出電磁脈衝手榴彈，對範圍內敵人造成 {damage} 點巨大衝擊傷害並以中心點強力擊退目標，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 35,
@@ -199,9 +201,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: 'Fracture Ray', 
-        active: true, 
+      'ult': {
+        name: 'Fracture Ray',
+        active: true,
         desc: '某方塊頭的雷射炮。蓄力 {chargeTime} 秒將所有聚能核心加載至手槍，在 {animationTime} 秒內向前方發射毀滅性的巨大脈衝，造成 {damage} 點傷害，冷卻 {cooldown} 秒。',
         cooldown: 12000,
         damage: 50,
@@ -228,41 +230,41 @@ export const WeaponConfig = {
       description: '射擊模式下自動啟動輔助射擊陀螺儀，射擊時獲得微幅自動追蹤或準心跟隨效果，提升掃射準確度。'
     },
     hiveActions: {
-      'fire': { 
-        name: '戰術射擊', 
-        active: true, 
+      'fire': {
+        name: '戰術射擊',
+        active: true,
         desc: '以極高射速進行全自動連續射擊，每發子彈造成 {damage} 點傷害，射擊冷卻為 {cooldown} 秒。',
-        cooldown: 250,
-        damage: 15,
+        cooldown: 100,
+        damage: 13,
         type: 'linear',
         speed: 55.0,
         color: 0xffd700,
-        size: 0.2
+        size: 0.1
       },
-      'reload': { 
-        name: '快速擴容彈夾', 
-        active: true, 
+      'reload': {
+        name: '快速擴容彈夾',
+        active: true,
         desc: '更換特製的高容量擴容彈匣，裝填耗時 {duration} 秒，大幅增加彈藥續航力。',
         duration: 2000,
         chargeTime: 500,
         animationTime: 2000
       },
-      'aim': { 
-        name: '伸縮倍鏡', 
-        active: true, 
+      'aim': {
+        name: '伸縮倍鏡',
+        active: true,
         desc: '切換為戰術瞄準視鏡，提供 {minZoom}x 至 {maxZoom}x 自由無級調節倍率，適應各距離戰場。',
         minZoom: 1.0,
         maxZoom: 4.0,
         defaultZoom: 2.0
       },
-      'slash': { 
-        name: '揮舞', 
-        active: false, 
-        desc: '此槍械武器不支援近戰揮舞。' 
+      'slash': {
+        name: '揮舞',
+        active: false,
+        desc: '此槍械武器不支援近戰揮舞。'
       },
-      'skill': { 
-        name: '燃燒瓶', 
-        active: true, 
+      'skill': {
+        name: '燃燒瓶',
+        active: true,
         desc: '便宜好做，平民神器！蓄力 {chargeTime} 秒拋出簡易燃燒瓶，在區域內造成持續燃燒傷害，並減速敵人 50%，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 15,
@@ -276,9 +278,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: 'MG3讓遊戲變簡單', 
-        active: true, 
+      'ult': {
+        name: 'MG3讓遊戲變簡單',
+        active: true,
         desc: '從不知道哪裡掏出來的 MG3。蓄力 {chargeTime} 秒後進入重裝火力壓制狀態。期間無法移動，子彈無限，射速加倍，且大招持續 {duration} 秒，冷卻 {cooldown} 秒。',
         cooldown: 35000,
         damage: 20,
@@ -305,41 +307,41 @@ export const WeaponConfig = {
       description: '在瞄準模式下，每擊殺一名敵人會立即返還一枚子彈，並自動填入彈夾。'
     },
     hiveActions: {
-      'fire': { 
-        name: '精準射擊', 
-        active: true, 
+      'fire': {
+        name: '精準射擊',
+        active: true,
         desc: '單發發射超高動能穿甲彈，具備毀滅性的 {damage} 點單發傷害，冷卻間隔 {cooldown} 秒。',
-        cooldown: 1200,
-        damage: 80,
+        cooldown: 2000,
+        damage: 100,
         type: 'linear',
         speed: 80.0,
-        color: 0xff3333,
+        color: 0xffd700,
         size: 0.35
       },
-      'reload': { 
-        name: '狙擊槍擴容彈夾', 
-        active: true, 
+      'reload': {
+        name: '狙擊槍擴容彈夾',
+        active: true,
         desc: '手動裝填重型穿甲彈藥，裝填需耗時 {duration} 秒。單發威力巨大但攜彈量極度有限。',
         duration: 2000,
         chargeTime: 500,
         animationTime: 2000
       },
-      'aim': { 
-        name: '伸縮高倍鏡', 
-        active: true, 
+      'aim': {
+        name: '伸縮高倍鏡',
+        active: true,
         desc: '切換為超遠距高倍瞄準視鏡，提供 {minZoom}x 至 {maxZoom}x 放大倍率切換，精準鎖定敵方要害。',
         minZoom: 2.0,
         maxZoom: 6.0,
         defaultZoom: 4.0
       },
-      'slash': { 
-        name: '揮舞', 
-        active: false, 
-        desc: '此槍械武器不支援近戰揮舞。' 
+      'slash': {
+        name: '揮舞',
+        active: false,
+        desc: '此槍械武器不支援近戰揮舞。'
       },
-      'skill': { 
-        name: '地刺陷阱', 
-        active: true, 
+      'skill': {
+        name: '地刺陷阱',
+        active: true,
         desc: '向前方中距離拋出地刺陷阱，對範圍內敵人造成單次 {damage} 點小額傷害，並使敵人停滯，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 5,
@@ -353,9 +355,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: 'ZAWARUDO', 
-        active: true, 
+      'ult': {
+        name: 'ZAWARUDO',
+        active: true,
         desc: '「ZA WARUDO！」使時間流速變慢。雙手蓄力 {chargeTime} 秒後啟動時空暫停力場，減緩場上所有敵人的動作，持續 {duration} 秒，冷卻 {cooldown} 秒。',
         cooldown: 25000,
         damage: 0,
@@ -382,9 +384,9 @@ export const WeaponConfig = {
       description: '受擊時自動觸發彈刀格擋，使所受傷害直接降低 30%。'
     },
     hiveActions: {
-      'fire': { 
-        name: '亂丟劍氣的好日子', 
-        active: true, 
+      'fire': {
+        name: '亂丟劍氣的好日子',
+        active: true,
         desc: '單發向前方釋放兩道交叉的自動追蹤劍氣，每發造成 {damage} 點傷害，冷卻間隔 {cooldown} 秒。',
         cooldown: 350,
         damage: 20,
@@ -393,26 +395,26 @@ export const WeaponConfig = {
         color: 0x9400d3,
         size: 0.4
       },
-      'reload': { 
-        name: '換彈', 
-        active: false, 
-        desc: '魘魔刀以血祭暗影核心驅動，不需裝填實體彈夾。' 
+      'reload': {
+        name: '換彈',
+        active: false,
+        desc: '魘魔刀以血祭暗影核心驅動，不需裝填實體彈夾。'
       },
-      'aim': { 
-        name: '精準瞄準', 
-        active: false, 
-        desc: '近戰刀法姿態不具備瞄準鏡功能。' 
+      'aim': {
+        name: '精準瞄準',
+        active: false,
+        desc: '近戰刀法姿態不具備瞄準鏡功能。'
       },
-      'slash': { 
-        name: '斬滅諸惡', 
-        active: true, 
+      'slash': {
+        name: '斬滅諸惡',
+        active: true,
         desc: '揮舞大太刀向前方揮砍，對近距離敵人造成 {damage} 點扇形範圍的快速斬擊傷害，冷卻 {cooldown} 秒。',
         cooldown: 350,
         damage: 35
       },
-      'skill': { 
-        name: '虛無刀界', 
-        active: true, 
+      'skill': {
+        name: '虛無刀界',
+        active: true,
         desc: '舉刀擺出居合收刀架勢，蓄力 {chargeTime} 秒向前方大範圍扇形揮砍，留下緩慢前進且能持續撕裂敵人造成 {damage} 點傷害的圓弧劍氣，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 45,
@@ -426,9 +428,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: '科目一', 
-        active: true, 
+      'ult': {
+        name: '科目一',
+        active: true,
         desc: '蓄力 {chargeTime} 秒後向左前方極速衝出留下殘影刀光，對大範圍內敵人造成持續多段撕裂斬擊，收刀入鞘時引爆 {damage} 點巨額傷害，冷卻 {cooldown} 秒。',
         cooldown: 12000,
         damage: 100,
@@ -455,9 +457,9 @@ export const WeaponConfig = {
       description: '擁有兩套完全不同的技能組。施展大招時在【常態】與【渴望】型態間切換。攻擊命中可恢復血素；常態下施法將消耗血素，渴望型態下施法不消耗血素。'
     },
     hiveActions: {
-      'fire': { 
-        name: '鮮血長矛 / 血箭血泊', 
-        active: true, 
+      'fire': {
+        name: '鮮血長矛 / 血箭血泊',
+        active: true,
         desc: '【常態-鮮血長矛】：消耗血素發射遠程追蹤長槍，造成 {damage} 傷害，冷卻 {cooldown} 秒。 / 【渴望-血箭血泊】：免消耗，召喚密集血箭覆蓋目標區域，造成持續傷害。',
         cooldown: 350,
         damage: 20,
@@ -466,26 +468,26 @@ export const WeaponConfig = {
         color: 0xff0044,
         size: 0.4
       },
-      'reload': { 
-        name: '換彈', 
-        active: false, 
-        desc: '血肉重鑄使用體內血素運作，不支持常規換彈。' 
+      'reload': {
+        name: '換彈',
+        active: false,
+        desc: '血肉重鑄使用體內血素運作，不支持常規換彈。'
       },
-      'aim': { 
-        name: '精準瞄準', 
-        active: false, 
-        desc: '血巫觸媒不支援加裝光學瞄準鏡。' 
+      'aim': {
+        name: '精準瞄準',
+        active: false,
+        desc: '血巫觸媒不支援加裝光學瞄準鏡。'
       },
-      'slash': { 
-        name: '血鞭 / 血刃', 
-        active: true, 
+      'slash': {
+        name: '血鞭 / 血刃',
+        active: true,
         desc: '【常態-血鞭】：以血素凝聚的血鞭，向前方揮舞造成近距離 {damage} 點扇形傷害，冷卻 {cooldown} 秒。 / 【渴望-血刃】：免消耗，從領域生成大範圍血霧之刃造成切割傷害。',
         cooldown: 350,
         damage: 30
       },
-      'skill': { 
-        name: '血肉崩解 / 無淵之刺', 
-        active: true, 
+      'skill': {
+        name: '血肉崩解 / 無淵之刺',
+        active: true,
         desc: '【常態-血肉崩解】：消耗血素在敵方腳下凝聚法陣，噴發上升紅色光炮，造成 {damage} 傷害。 / 【渴望-無淵之刺】：免消耗，從領域召喚多根血矛刺穿中範圍敵人。蓄力 {chargeTime} 秒，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 40,
@@ -499,9 +501,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: '冥河 / 惡之血', 
-        active: true, 
+      'ult': {
+        name: '冥河 / 惡之血',
+        active: true,
         desc: '【常態-冥河】：血素滿額時展開「血之領域」並切為渴望形態。 / 【渴望-惡之血，最後的綻放】：血素滿額時收束領域並引爆彼岸花造成 {damage} 點高額傷害。蓄力 {chargeTime} 秒，冷卻 {cooldown} 秒。',
         cooldown: 12000,
         damage: 90,
@@ -528,9 +530,9 @@ export const WeaponConfig = {
       description: '將畢生所學獻給爆裂魔法。施展大招「Explosion!」後會耗盡所有魔力進入【缺魔狀態】，持續 120 秒。期間所有法術完全衰竭為微量傷害的物理打擊。'
     },
     hiveActions: {
-      'fire': { 
-        name: '小火球 / 丟石頭', 
-        active: true, 
+      'fire': {
+        name: '小火球 / 丟石頭',
+        active: true,
         desc: '【常態-小火球】：發射一發遠程追蹤的小火球，造成 {damage} 傷害，冷卻 {cooldown} 秒。 / 【缺魔-丟石頭】：拿起路邊的石頭奮力丟出造成微量傷害。',
         cooldown: 350,
         damage: 20,
@@ -539,26 +541,26 @@ export const WeaponConfig = {
         color: 0xff4500,
         size: 0.35
       },
-      'reload': { 
-        name: '換彈', 
-        active: false, 
-        desc: '法術元素藉由魔力凝聚，不支援物理裝彈。' 
+      'reload': {
+        name: '換彈',
+        active: false,
+        desc: '法術元素藉由魔力凝聚，不支援物理裝彈。'
       },
-      'aim': { 
-        name: '精準瞄準', 
-        active: false, 
-        desc: '魔法導能系統不支持光學瞄準準星。' 
+      'aim': {
+        name: '精準瞄準',
+        active: false,
+        desc: '魔法導能系統不支持光學瞄準準星。'
       },
-      'slash': { 
-        name: '光之聖劍 / 物理聖劍', 
-        active: true, 
+      'slash': {
+        name: '光之聖劍 / 物理聖劍',
+        active: true,
         desc: '【常態-光之聖劍】：以雷光匯聚元素之劍橫掃，造成 {damage} 點中距離傷害，冷卻 {cooldown} 秒。 / 【缺魔】：用法杖敲擊近身敵人造成微量傷害。',
         cooldown: 350,
         damage: 30
       },
-      'skill': { 
-        name: '風神之詩', 
-        active: true, 
+      'skill': {
+        name: '風神之詩',
+        active: true,
         desc: '【常態-風神之詩】：拋出風神魔導具引導風暴，對大範圍內敵人造成持續傷害並強力聚怪。蓄力 {chargeTime} 秒，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 10,
@@ -572,9 +574,9 @@ export const WeaponConfig = {
         chargeTime: 1000,
         animationTime: 3000
       },
-      'ult': { 
-        name: 'Explosion!', 
-        active: true, 
+      'ult': {
+        name: 'Explosion!',
+        active: true,
         desc: '【常態-Explosion!】：吟唱不必要的爆裂咒文，蓄力 {chargeTime} 秒引爆巨額爆裂魔法，造成 {damage} 點大範圍毀滅傷害，隨後進入 120 秒缺魔狀態，冷卻 {cooldown} 秒。',
         cooldown: 20000,
         damage: 150,

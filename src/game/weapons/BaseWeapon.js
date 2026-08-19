@@ -117,12 +117,15 @@ export class BaseWeapon {
       if (this.reloadTimer <= 0) {
         this.isReloading = false;
         this.coreEnergy = 0;
+        this.onReloadComplete();
         console.log(`[BaseWeapon] Reload complete for ${this.id}`);
       }
     } else {
       this.updateCoreEnergy(deltaTime);
     }
   }
+
+  onReloadComplete() {}
 
   updateCoreEnergy(deltaTime) {
     if (this.coreEnergy > 0) {
