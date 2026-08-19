@@ -65,8 +65,16 @@
 │   │   └── WeaponConfig.js     # 統一武器屬性與手勢動作觸發閾值設定檔
 │   │
 │   ├── game/
-│   │   ├── BaseWeapon.js       # 武器邏輯基礎類別與冷卻計算
-│   │   └── GameWorld.js        # [NEW] Three.js 3D 空間建置、競技場地表與玩家移動渲染引擎
+│   │   ├── ActionHelper.js     # 動作與發射物輔助系統 (取代舊 ProjectileManager)
+│   │   ├── GameWorld.js        # Three.js 3D 空間建置、競技場地表與玩家移動渲染引擎
+│   │   └── weapons/
+│   │       ├── BaseWeapon.js   # 武器邏輯基礎類別與冷卻計算
+│   │       ├── PistolWeapon.js # 遠程雷射槍武器
+│   │       ├── RifleWeapon.js  # 自動步槍武器
+│   │       ├── SniperWeapon.js # 電磁狙擊槍武器
+│   │       ├── KatanaWeapon.js # 近戰光刃武器
+│   │       ├── BloodMagicWeapon.js # 深紅血巫術武器
+│   │       └── CrimsonClanWeapon.js # 紅魔族爆炸法術武器
 │   │
 │   ├── gestures/
 │   │   ├── BaseGesture.js      # 單手/雙手特徵運算基底類別
@@ -74,8 +82,12 @@
 │   │
 │   └── ui/
 │       ├── style.css           # 扁平化深色科技感介面樣式表
+│       ├── gameplay.css        # 2D 戰鬥對稱懸浮 HUD 專屬樣式表
 │       ├── MenuManager.js      # 主選單、暫停選單、虛擬游標與自定義 UI style 確認彈窗
-│       └── GestureTestWindow.js# Premium 浮動五區塊手勢診斷調試面板 (核心除錯模組)
+│       ├── GameUIManager.js    # 2D 戰鬥 HUD、十字準星定位與兩側技能格管理器
+│       └── views/
+│           ├── BaseView.js     # 視圖生命週期基類
+│           └── ...             # 各分頁視圖組件 (MainMenuView, WeaponsView, 等)
 │
 └── test_data/                  # 用於偵錯的預錄手勢特徵 JSON 檔案庫
 ```

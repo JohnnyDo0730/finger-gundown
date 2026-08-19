@@ -115,10 +115,9 @@ export class BaseEnemy {
   /**
    * Unified damage receiver method.
    * @param {number} amount - Damage points
-   * @param {THREE.Vector3} [hitPoint] - Exact hit location (unused for logic, kept for reference)
    * @param {THREE.Vector3} [knockbackVector] - Knockback velocity impulse to apply
    */
-  takeDamage(amount, hitPoint, knockbackVector) {
+  takeDamage(amount, knockbackVector) {
     if (!this.isAlive) return;
 
     this.hp = Math.max(0, this.hp - amount);
