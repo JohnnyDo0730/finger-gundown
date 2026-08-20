@@ -156,20 +156,24 @@ export const WeaponConfig = {
         desc: '單點發射高能熱磁雷射，具備穿透路徑上所有敵人的電磁效能，每次發射會累積 {heatPerShot}% 熱能，冷卻 {cooldown} 秒。',
         cooldown: 450,
         damage: 25,
-        type: 'stationary_beam',
-        beamLength: 60.0,
-        beamRadius: 0.1,
-        duration: 300,
-        tickInterval: 5000,  // 5s interval: guarantees exactly one hit during 0.3s beam lifetime
-        color: 0xff0000,
-        heatPerShot: 20.0
+        heatPerShot: 20.0,
+        projectiles: [
+          {
+            shape: { type: 'cylinder', radius: 0.1, length: 60.0, pivot: 'start' },
+            motion: { type: 'stationary' },
+            collision: { type: 'once_per_target', damage: 25, knockbackStrength: 3.0 },
+            duration: 300,
+            color: 0xff0000,
+            opacity: 0.8
+          }
+        ]
       },
       'reload': {
         name: '過載冷卻',
         active: true,
         desc: '主動開啟散熱閥，在 {duration} 秒裝填時間內快速排出核心熱能並重置過載。',
         duration: 2000,
-        chargeTime: 500,
+        chargeTime: 1500,
         animationTime: 2000
       },
       'aim': {
@@ -190,32 +194,56 @@ export const WeaponConfig = {
         active: true,
         desc: '軍人必備！蓄力 {chargeTime} 秒拋出電磁脈衝手榴彈，對範圍內敵人造成 {damage} 點巨大衝擊傷害並以中心點強力擊退目標，冷卻 {cooldown} 秒。',
         cooldown: 5000,
-        damage: 35,
-        type: 'stationary',
-        radius: 5.0,
-        duration: 3000,
-        rotateSpeed: 1.5,
-        pulseSpeed: 4.0,
-        tickInterval: 500,
-        color: 0x00ffcc,
-        chargeTime: 1000,
-        animationTime: 3000
+        damage: 50,
+        chargeTime: 1500,
+        animationTime: 1000,
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 0.3 },
+            motion: { type: 'parabolic' },
+            collision: { type: 'none' },
+            duration: 1000, // Dynamic fly duration calculated in code
+            color: 0x00aaff,
+            opacity: 1.0
+          },
+          {
+            shape: { type: 'sphere', radius: 4.0 },
+            motion: { type: 'stationary_pulsing', cycles: 0.5 },
+            collision: { type: 'once_per_target', damage: 50, knockbackStrength: 8.0 },
+            duration: 2000,
+            delay: 1000, // Dynamic delay matching fly duration
+            color: 0x00aaff,
+            opacity: 0.5
+          }
+        ]
       },
       'ult': {
         name: 'Fracture Ray',
         active: true,
-        desc: '某方塊頭的雷射炮。蓄力 {chargeTime} 秒將所有聚能核心加載至手槍，在 {animationTime} 秒內向前方發射毀滅性的巨大脈衝，造成 {damage} 點傷害，冷卻 {cooldown} 秒。',
+        desc: '某方塊頭的雷射炮。蓄力 {chargeTime} 秒將所有聚能核心加載至手槍，在 {animationTime} 秒內向前方發射毀滅性的巨大脈衝，持續造成 {damage} 點傷害，冷卻 {cooldown} 秒。',
         cooldown: 12000,
-        damage: 50,
-        type: 'stationary',
-        radius: 9.0,
-        duration: 5000,
-        rotateSpeed: 5.0,
-        pulseSpeed: 8.0,
-        tickInterval: 250,
-        color: 0x00ffff,
+        damage: 25,
         chargeTime: 1500,
-        animationTime: 5000
+        animationTime: 6000,
+        projectiles: [
+          {
+            shape: { type: 'cylinder', radius: 1.2, length: 0.1 },
+            motion: { type: 'stationary_pulsing', cycles: 0.25 },
+            collision: { type: 'none' },
+            duration: 1000,
+            color: 0xffaa00,
+            opacity: 0.5
+          },
+          {
+            shape: { type: 'cylinder', radius: 1.0, length: 50.0, pivot: 'start' },
+            motion: { type: 'stationary' },
+            collision: { type: 'aoe', damage: 25, tickInterval: 250, knockbackStrength: 4.0 },
+            duration: 4000,
+            delay: 1000,
+            color: 0xffaa00,
+            opacity: 0.5
+          }
+        ]
       }
     }
   },
@@ -236,10 +264,16 @@ export const WeaponConfig = {
         desc: '以極高射速進行全自動連續射擊，每發子彈造成 {damage} 點傷害，射擊冷卻為 {cooldown} 秒。',
         cooldown: 100,
         damage: 13,
-        type: 'linear',
-        speed: 55.0,
-        color: 0xffd700,
-        size: 0.1
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 0.1 },
+            motion: { type: 'linear', speed: 55.0 },
+            collision: { type: 'impact', damage: 13, knockbackStrength: 3.0 },
+            duration: 3000,
+            color: 0xffd700,
+            opacity: 0.9
+          }
+        ]
       },
       'reload': {
         name: '快速擴容彈夾',
@@ -313,10 +347,16 @@ export const WeaponConfig = {
         desc: '單發發射超高動能穿甲彈，具備毀滅性的 {damage} 點單發傷害，冷卻間隔 {cooldown} 秒。',
         cooldown: 2000,
         damage: 100,
-        type: 'linear',
-        speed: 80.0,
-        color: 0xffd700,
-        size: 0.35
+        projectiles: [
+          {
+            shape: { type: 'cylinder', radius: 0.1, length: 1.4 },
+            motion: { type: 'linear', speed: 80.0 },
+            collision: { type: 'impact', damage: 100, knockbackStrength: 3.0 },
+            duration: 3000,
+            color: 0xffd700,
+            opacity: 0.95
+          }
+        ]
       },
       'reload': {
         name: '狙擊槍擴容彈夾',

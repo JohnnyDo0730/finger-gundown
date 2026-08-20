@@ -31,6 +31,7 @@ export class BaseWeapon {
     this.isReloading = false;
     this.reloadTimer = 0;
     this.model = null; // Three.js mesh/group
+    this.currentZoomTier = 0; // 0, 1, or 2 for hysteresis zoom steps
   }
 
   /**

@@ -384,7 +384,8 @@ export class GestureEngine {
     const wrist = landmarks[0];
     const thumbBase = landmarks[2];
     const pinkyKnuckle = landmarks[17];
-    if (!wrist || !thumbBase || !pinkyKnuckle) return;
+    const middleRoot = landmarks[9];
+    if (!wrist || !thumbBase || !pinkyKnuckle || !middleRoot) return;
 
     // Palm must face camera (thumb left of pinky)
     const isPalmFacing = thumbBase.x < pinkyKnuckle.x;
@@ -419,12 +420,14 @@ export class GestureEngine {
       return;
     }
 
-    // Closed fingers check (low spacing gap)
+    // Closed fingers check (low spacing gap normalized by distance-invariant palm size)
     const d_index_middle = getDistance(indexTip, middleTip);
     const d_middle_ring = getDistance(middleTip, ringTip);
     const gap = d_index_middle + d_middle_ring;
+    const palmSize = getDistance(wrist, middleRoot);
+    const ratio = palmSize > 0.001 ? gap / palmSize : 999;
 
-    if (gap < 0.075) {
+    if (ratio < 0.45) {
       if (this.chargeStarts.pause === 0) {
         this.chargeStarts.pause = timestamp;
         this.states.pause = true;
@@ -567,20 +570,22 @@ export class GestureEngine {
         this.syncAimStartRightWrist = { x: rightHand[0].x, y: rightHand[0].y };
       }
 
-      // Linear zoom mapping (distance between middle & index tip)
-      // OK gesture (middle finger extended) is maximum magnification (ratio = 1.0)
-      // Middle finger closed towards index is minimum magnification (ratio = 0.0)
-      const distMiddleIndex = getDistance(middleTip, indexTip);
-      let ratio = (distMiddleIndex - 0.03) / 0.08;
-      ratio = Math.max(0, Math.min(1, ratio));
-      this.syncAimZoom = ratio; // Zoom represents normalized ratio [0.0, 1.0]
-
+      // Only update the zoom ratio when the left hand OK pinch is actively detected.
+      // This prevents the zoom level from dropping to 1x during the 500ms release transition buffer.
+      let ratio = this.syncAimZoom;
+      if (isLeftAimDetected) {
+        const distMiddleIndex = getDistance(middleTip, indexTip);
+        ratio = (distMiddleIndex - 0.03) / 0.08;
+        ratio = Math.max(0, Math.min(1, ratio));
+        this.syncAimZoom = ratio; // Zoom represents normalized ratio [0.0, 1.0]
+      }
+ 
       let deltaX = 0, deltaY = 0;
       if (rightHand && rightHand[0] && this.syncAimStartRightWrist) {
         deltaX = rightHand[0].x - this.syncAimStartRightWrist.x;
         deltaY = rightHand[0].y - this.syncAimStartRightWrist.y;
       }
-
+ 
       this.emit('ON_SYNC_AIM', { active: true, zoom: this.syncAimZoom, zoomRatio: ratio, deltaX, deltaY });
       return true;
     }
