@@ -234,8 +234,12 @@ UI 排版必須能動態適配各種螢幕高度（縱向排版為主），且�
 ### 4. 視訊管線與 Wasm 堆積記憶體安全防護 (Wasm Leak Avoidance)
 * **陷阱成因**：MediaPipe Holistic 底層載入的 C++ Wasm 模組會向瀏覽器索取大量 GPU 紋理與 WebAssembly 內存。若在同一個 Session 中動態 `close()` 相機並頻繁 `new Holistic()`，將直接導致 Emscripten loader 出現 Wasm 堆積溢出並使整個頁面凍結崩潰。
 * **預防規範**：
-  * **單一 Holistic 實例複用**：在單次 Session 中，`holisticInstance` 僅加載一次且在記憶體中保持存活。對於全域鏡頭的開啟/關閉切換，一律採用 localStorage 保存狀態後，直接呼叫 `location.reload()` 進行頁面硬整理，由瀏覽器直接釋放 WebGL 與 Wasm Context 資源。
+  * **單一 Holistic 實例複用**：在單次 Session 中，`holisticInstance` 僅加載一次且在記憶體中保持存活。對於全域鏡頭的開啟/關閉切換，一律採用 localStorage保存狀態後，直接呼叫 `location.reload()` 進行頁面硬整理，由瀏覽器直接釋放 WebGL 與 Wasm Context 資源。
   * **退場重新整理機制 (Exit-Time Reload Bypass)**：在未開啟全域偵測時，重複進出測試頁（與未來遊戲頁）會反覆初始化與銷毀相機串流而造成效能卡頓。系統對此在 `MenuManager.js` 的 `transitionToView` 路由接口中實作了退場重新整理機制：當檢測到即將退出相機追蹤視圖且全域偵測為關閉時，首先執行原定的退出動作與動畫（側邊面板收縮與中央消失），等待安全計時器（約 950ms~1100ms）結束且 DOM 完全移出文件後，立即執行 `location.reload()` 重刷網頁。重新整理後會自動掛載主頁並流暢播起主選單的進場動效，在完全不影響視覺順暢度的情況下徹底杜絕記憶體洩漏。
+
+### 5. 瞄準事件重複觸發導致偏移量與歷史隊列每影格重置 (Aim State Instantly Resetting Every Frame)
+* **陷阱成因**：當玩家處於開鏡瞄準狀態時，手勢引擎 `GestureEngine` 在每影格都會發送帶有 `active: true` 的 `ON_SYNC_AIM` 事件。然而，原本的 `PlayerController` 監聽器缺乏狀態變更保護門檻，導致**每一影格都在無條件重新執行開鏡初始化代碼**。這會造成 `aimYawOffset` 與 `aimPitchOffset` 每一影格開頭都被強制歸零，使視角偏移量根本無法在影格間累積，畫面只能做出微小的單幀抖動，無法有效旋轉視角；此外，防抖滑動平均歷史隊列 `aimHandHistory` 與除噪計時器每影格都被重置清空，防抖濾波形同虛設，關鏡時由於 `aimYawOffset` 剛被歸零，相機所吸收的基底 yaw 也是錯誤的，導致視角無法正常歸位。
+* **預防規範**：在 `PlayerController` 的事件監聽器中，必須加入**狀態變更攔截保護**（`if (this.isZoomed !== data.active)`）。只有在瞄準狀態「真正發生切換」的那一幀，才執行初始化（開鏡）或基底朝向吸收與清理（關鏡）邏輯，防止持續觸發引起的每幀重置歸零問題。
 
 ---
 
@@ -276,3 +280,19 @@ UI 排版必須能動態適配各種螢幕高度（縱向排版為主），且�
 ### 5. 物件導向武器架構與實時暫停頁同步 (OO Weapons & Real-time Pause Sync)
 * **BaseWeapon 與具體武器繼承**：武器統一繼承自 [BaseWeapon.js](file:///d:/06-程式/02_Html/02_FingerGundown/src/game/weapons/BaseWeapon.js), 實現冷卻時間計時、換彈計時、開鏡倍率與核心能量狀態在基類自動運作，避免子類代碼重複。各別武器子類只實現自定義的發射物或技能效果（例如 `PistolWeapon`, `RifleWeapon`, `SniperWeapon`, `KatanaWeapon`, `BloodMagicWeapon`, `CrimsonClanWeapon`）。
 * **實時暫停同步**：在 `PlayerController.js` 的 `update(deltaTime)` 首影格檢測 `localStorage` 中儲存的 `gesture_selected_weapon` 指標。當玩家於暫停狀態下的武器頁切換選擇並點選 Resume 返回遊戲後，控制器會立刻捕獲差異並重置加載新武器實例，技能格與冷卻資訊在 1 幀內完成刷新，無縫銜接戰鬥。
+
+### 6. 組件化飛射物生成架構 (Modular Projectile Composition System)
+* **標準配置結構**：武器發射物（以三種槍的主射擊 `fire` 為主）改為配置驅動的組件化結構。在 `WeaponConfig.js` 中使用 `projectiles` 陣列儲存物件資訊，包含：
+  * `shape`：形狀與尺寸幾何參數（如 `type: 'cylinder'`, `radius: 0.1`, `length: 60.0`, `pivot: 'start'`）。
+  * `motion`：運動動畫控制（如 `type: 'linear', speed: 80.0` 或 `type: 'stationary'`）。
+  * `collision`：碰撞與傷害模式（如 `type: 'impact'` 或 `type: 'once_per_target'`）。
+  * `duration` (毫秒) 與 `delay` (毫秒)：表示飛射物的主動存活期與啟動前的等待時差。
+  * `color` 與 `opacity`：控制飛射物的外觀材質渲染。
+* **底層 ActionHelper 自動補全與延遲**：
+  * **碰撞簡化繼承**：如果 `collision` 物件中省略了 `shape`、`length` 或 `radius`，底層 `ActionHelper.js` 會自動讀取最外層 `shape` 的同名屬性作為備用參數，防止配置冗餘。
+  * **啟動延遲控制**：在延遲階段（`elapsed < delay`）時，Mesh 將保持 `visible = false` 且不執行任何運動或碰撞計算；脈衝縮放或 AOE tick 計時改以 `elapsed - delay` 相對時間計算，解決畫面出現殘影或提早判定傷害的問題。
+
+### 7. 戰術開鏡瞄準防抖與動態錨點重置 (Tactical Zoom Scoping & Dynamic Center Anchoring)
+* **滑動平均手勢濾波 (Sliding Window Moving Average Filter)**：絕對定位映射下，當手勢位於畫面邊緣或人體生理疲勞時，Webcam 所得的 MediaPipe 手部坐標會產生強烈的高頻雜訊。系統使用一個 5 影格的滑動歷史隊列（`aimHandHistory`）均攤手部座標，搭配恆定中速 `followSpeed = 8.0` 進行相機朝向插值。如此能使單影格的劇烈訊號跳變僅佔 1/5 的低比重，徹底消除高倍鏡微調時的生硬抖動與操作延遲。
+* **動態中心錨點調整 (Dynamic Center Anchoring)**：由於開鏡瞄準時，相機水平與垂直的可偏轉上限（`effectiveMaxYaw` / `Pitch`）會隨著 FOV 縮放而按比例收縮。此時若右手偏離螢幕中心，尺規收縮會導致視角的目標角度發生突變，引發鏡頭無故平移（Drift）。系統在 `update` 的縮放插值期間，計算前後影格的邊界比率，按比例縮放當前 Yaw 偏移量的同時，**反向補償基底中心朝向**（$\text{aimCenterYaw}_{\text{new}} = (\text{aimCenterYaw}_{\text{old}} + \text{aimYawOffset}_{\text{old}}) - \text{aimYawOffset}_{\text{new}}$）。這可確保改變放大倍率時，鏡頭畫面所鎖定的 3D 空間目標絕對靜止。
+* **無縫關鏡還原 (Zero-Snap Return Transition)**：為防止關鏡時相機因為動態錨點微調過後的偏差產生瞬間跳躍（Snap），關鏡瞬間首先將基底 `yaw` 設為出鏡時的實際中心 `aimCenterYaw` 以達到 0 突變過渡。隨後在非開鏡狀態下，使 `aimYawOffset` 與 `aimPitchOffset` 以 `restoreSpeed = 4.0` 緩緩歸零，並同步將基底 `this.yaw` 平滑插值回最一開始進鏡時的原始朝向 `aimStartYaw`。若玩家在回彈過程中輸入了手動 steering 控制，則立刻取消自動歸位程序以防操控對抗。

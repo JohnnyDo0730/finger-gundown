@@ -50,6 +50,7 @@ export class GestureTestView extends BaseView {
     this.latestVisionResults = null;
     this.calibrationStep = 0; // 0 = Idle, 1 = TL, 2 = TR, 3 = BL, 4 = BR, 5 = Done
     this.calibPoints = [];
+    this.recordedPoses = this.loadRecordedPoses();
   }
 
   createDOM() {
@@ -321,6 +322,22 @@ export class GestureTestView extends BaseView {
         this.app.visionManager.updateFilters(100, 110);
       });
     }
+
+    // Developer Pose Recorder buttons
+    const recordBtn = this.domElement.querySelector('#btn-record-pose');
+    const downloadBtn = this.domElement.querySelector('#btn-download-poses');
+    const clearBtn = this.domElement.querySelector('#btn-clear-poses');
+
+    if (recordBtn) {
+      recordBtn.addEventListener('click', () => this.recordPoseCurrentFrame());
+    }
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => this.downloadPoses());
+    }
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.clearPoses());
+    }
+    this.updateRecordUI();
 
     // Define GestureEngine event listeners for active card transitions
     this.fireStateListener = (data) => {
@@ -1001,13 +1018,13 @@ export class GestureTestView extends BaseView {
 
     if (mode === 'record') {
       if (recordControls) recordControls.classList.remove('hidden');
+      if (calibrationGuide) calibrationGuide.classList.add('hidden');
     } else {
       if (recordControls) recordControls.classList.add('hidden');
-    }
-
-    if (calibrationGuide) {
-      calibrationGuide.classList.remove('hidden');
-      this.updateGuidePanel();
+      if (calibrationGuide) {
+        calibrationGuide.classList.remove('hidden');
+        this.updateGuidePanel();
+      }
     }
 
     // Define card availability list
@@ -1182,15 +1199,6 @@ export class GestureTestView extends BaseView {
           <li style="color:#ff007f;"><em>🚫 模式限制：此模式下已禁用左手 OK 瞄準與右手 Reload 手勢。</em></li>
         </ul>
       `;
-    } else if (this.activeTestMode === 'record') {
-      guideContainer.innerHTML = `
-        <h4 style="margin-top: 0; color: var(--cyan-spatial);">手勢錄入與資料收集 (Developer Record Mode)</h4>
-        <ul class="calibration-list">
-          <li><strong>選擇手勢類型：</strong>在下方選擇要錄製的手勢（如 move, aim, fire 等）。</li>
-          <li><strong>開始錄製：</strong>擺好手勢後點擊「開始錄影」，將以 30fps 採集 3D Landmarks 特徵點。</li>
-          <li><strong>下載資料集：</strong>錄製完成後可下載 JSON 資料集，用以重新訓練神經網路分類器。</li>
-        </ul>
-      `;
     } else if (this.activeTestMode === 'calibrate') {
       if (this.calibrationStep === 0) {
         guideContainer.innerHTML = `
@@ -1337,5 +1345,105 @@ export class GestureTestView extends BaseView {
     }
 
     this.updateGuidePanel();
+  }
+
+  /**
+   * Load stored poses from localStorage.
+   */
+  loadRecordedPoses() {
+    try {
+      const data = localStorage.getItem('neural_arena_recorded_poses');
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Grab active landmarks frame and add it to the developer storage array.
+   */
+  recordPoseCurrentFrame() {
+    const nameInput = this.domElement.querySelector('#record-pose-name');
+    const name = (nameInput ? nameInput.value.trim() : '') || `未命名姿勢_${new Date().toLocaleTimeString()}`;
+
+    if (!this.latestVisionResults) {
+      alert('⚠️ 無法錄製：目前尚未接收到 any landmarks frame！');
+      return;
+    }
+
+    const hasLeft = !!this.latestVisionResults.leftHandLandmarks;
+    const hasRight = !!this.latestVisionResults.rightHandLandmarks;
+    const hasPose = !!this.latestVisionResults.poseLandmarks;
+
+    if (!hasLeft && !hasRight && !hasPose) {
+      alert('⚠️ 無法錄製：偵測到的雙手與肢體骨架數據為空。');
+      return;
+    }
+
+    const record = {
+      name,
+      timestamp: new Date().toISOString(),
+      leftHandLandmarks: this.latestVisionResults.leftHandLandmarks || null,
+      rightHandLandmarks: this.latestVisionResults.rightHandLandmarks || null,
+      poseLandmarks: this.latestVisionResults.poseLandmarks || null
+    };
+
+    this.recordedPoses.push(record);
+    localStorage.setItem('neural_arena_recorded_poses', JSON.stringify(this.recordedPoses));
+
+    this.updateRecordUI();
+    if (nameInput) nameInput.value = '';
+    console.log('[PoseRecorder] Recorded frame:', record);
+  }
+
+  /**
+   * Update recorder textbox statistics.
+   */
+  updateRecordUI() {
+    const recordCountEl = this.domElement.querySelector('#record-pose-count');
+    const previewBoxEl = this.domElement.querySelector('#record-preview-box');
+
+    if (recordCountEl) {
+      recordCountEl.textContent = this.recordedPoses.length;
+    }
+
+    if (previewBoxEl && this.recordedPoses.length > 0) {
+      const last = this.recordedPoses[this.recordedPoses.length - 1];
+      const leftCount = last.leftHandLandmarks ? 21 : 0;
+      const rightCount = last.rightHandLandmarks ? 21 : 0;
+      const poseCount = last.poseLandmarks ? 33 : 0;
+      previewBoxEl.value = `最新錄製: ${last.name}\n時間: ${new Date(last.timestamp).toLocaleTimeString()}\n左手節點: ${leftCount} | 右手節點: ${rightCount} | 身體骨架點: ${poseCount}`;
+    } else if (previewBoxEl) {
+      previewBoxEl.value = '尚無錄製紀錄。請輸入名稱並點選「錄製當前格」。';
+    }
+  }
+
+  /**
+   * Download recorded JSON.
+   */
+  downloadPoses() {
+    if (this.recordedPoses.length === 0) return;
+    const dataStr = JSON.stringify(this.recordedPoses, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `neural_arena_recorded_poses_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Clear recorded storage data.
+   */
+  clearPoses() {
+    if (this.recordedPoses.length === 0) return;
+    if (confirm('❓ 確定要清除所有已錄製 of Poses嗎？')) {
+      this.recordedPoses = [];
+      localStorage.removeItem('neural_arena_recorded_poses');
+      this.updateRecordUI();
+    }
   }
 }

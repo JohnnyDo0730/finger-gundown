@@ -17,17 +17,16 @@ export class SniperWeapon extends BaseWeapon {
       return false;
     }
 
-    if (context.actionHelper) {
-      context.actionHelper.spawnLinear(
-        startPoint,
-        direction,
-        actionConfig.speed,
-        actionConfig.damage,
-        3.0,
-        actionConfig.color,
-        actionConfig.size,
-        'cylinder' // Bullet shape is cylinder
-      );
+    if (context.actionHelper && actionConfig.projectiles) {
+      actionConfig.projectiles.forEach(pConfig => {
+        const projData = {
+          ...pConfig,
+          position: startPoint,
+          direction, // Pass direction at root
+          motion: { ...pConfig.motion, direction }
+        };
+        context.actionHelper.spawn(projData);
+      });
     }
 
     this.bullets--;
@@ -66,11 +65,29 @@ export class SniperWeapon extends BaseWeapon {
   syncAim(context) {
     if (this.playerController) {
       if (context.active) {
+        const rawZoom = context.zoom !== undefined ? context.zoom : 0.0;
+        
+        // Hysteresis threshold check to prevent zoom level oscillations from hand jitter
+        if (this.currentZoomTier === 0) {
+          if (rawZoom > 0.4) this.currentZoomTier = 1;
+        } else if (this.currentZoomTier === 1) {
+          if (rawZoom < 0.25) this.currentZoomTier = 0;
+          else if (rawZoom > 0.75) this.currentZoomTier = 2;
+        } else if (this.currentZoomTier === 2) {
+          if (rawZoom < 0.6) this.currentZoomTier = 1;
+        }
+
+        // Map discrete tiers to zoom values (Tier 0 = 0% of max zoom, Tier 1 = 50%, Tier 2 = 100%)
+        let zoomRatio = 0.0;
+        if (this.currentZoomTier === 1) zoomRatio = 0.5;
+        else if (this.currentZoomTier === 2) zoomRatio = 1.0;
+
         const minZoom = this.config.hiveActions.aim.minZoom || 2.0;
         const maxZoom = this.config.hiveActions.aim.maxZoom || 6.0;
-        const currentZoom = minZoom + (maxZoom - minZoom) * (context.zoom !== undefined ? context.zoom : 0.0);
+        const currentZoom = minZoom + (maxZoom - minZoom) * zoomRatio;
         this.playerController.targetFov = 75 / currentZoom;
       } else {
+        this.currentZoomTier = 0; // Reset
         this.playerController.targetFov = 75;
       }
     }
@@ -78,38 +95,12 @@ export class SniperWeapon extends BaseWeapon {
   }
 
   fireSkill(context) {
-    const actionConfig = this.config.hiveActions.skill;
-    const { targetPoint } = context;
-    if (context.actionHelper) {
-      context.actionHelper.spawnStationary(
-        targetPoint,
-        actionConfig.radius,
-        actionConfig.damage,
-        actionConfig.duration / 1000,
-        actionConfig.rotateSpeed,
-        actionConfig.pulseSpeed,
-        actionConfig.tickInterval / 1000,
-        actionConfig.color
-      );
-    }
+    // Projectiles removed as requested
     return true;
   }
 
   fireUltimate(context) {
-    const actionConfig = this.config.hiveActions.ult;
-    const { targetPoint } = context;
-    if (context.actionHelper) {
-      context.actionHelper.spawnStationary(
-        targetPoint,
-        actionConfig.radius,
-        actionConfig.damage,
-        actionConfig.duration / 1000,
-        actionConfig.rotateSpeed,
-        actionConfig.pulseSpeed,
-        actionConfig.tickInterval / 1000,
-        actionConfig.color
-      );
-    }
+    // Projectiles removed as requested
     return true;
   }
 }
