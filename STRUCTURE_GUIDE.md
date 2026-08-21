@@ -149,9 +149,10 @@ UI 排版必須能動態適配各種螢幕高度（縱向排版為主），且�
 
 為保證手勢操作的精準度與防誤觸性，手勢事件計算、平滑化與狀態過濾統一由 [GestureEngine.js](file:///d:/06-程式/02_Html/02_FingerGundown/src/core/GestureEngine.js) 處理：
 
-### 1. 座標平滑化與 Pinch 鎖定防抖 (Stabilization & Lock-Assist)
+### 1. 座標平滑化、Pinch 鎖定防抖與開掌防誤觸 (Stabilization & Anti-Misfire)
 * **游標平滑化**：手勢游標座標必須在引擎內部進行一階指數平滑濾波（Smoothing Factor 預設為 `0.35`），過濾手部生理微顫抖。
 * **Pinch 點擊鎖定輔助**：為防止捏合（Pinch）觸發點擊時，指尖合攏造成的座標位移（滑標），引擎在檢測到 `ON_FIRE`（Pinch）狀態為 `true` 的期間，必須**自動將遊標位移阻尼係數極大化（或鎖定座標）**，確保點擊操作精準定位。
+* **捏合射擊開掌防誤觸 (Anti-Misfire Check)**：為防止右手蓄力技能（如握拳姿勢）時指尖靠攏誤觸發 Pinch 射擊，射擊判定加入了**開掌檢測**。大拇指與食指捏合的同時，**中指或無名指必須至少有一根保持伸直（未收縮）**才允許判定為 `isPinching = true`；當右手完全握拳時，射擊會被物理阻斷，解決了蓄力技能與普攻開火的誤觸發衝突。
 
 ### 2. 靜態情境過濾 (Static Context Mask)
 引擎依據當前的 `appMode` 與 `weaponMode` 在內部進行第一層靜態事件過濾，未通過過濾的手勢不廣播其 ON 事件：
@@ -159,10 +160,10 @@ UI 排版必須能動態適配各種螢幕高度（縱向排版為主），且�
 * **`DEBUG` 模式（手勢測試頁）**：根據測試頁當前選中的 Mode Tab（如 `basic`, `ranged`, `melee`），決定對應卡片的手勢是否啟用，若啟用則輸出狀態變更事件，若未啟用則引擎靜態阻斷。
 * **`GAME` 模式（戰鬥中）**：僅啟用目前玩家手持武器（定義於 `WeaponConfig.js` 中）支援的 `hiveActions` 手勢，其他手勢直接屏蔽。
 
-### 3. 動態動畫鎖定 (Dynamic Animation Lockout)
-* 當換彈或釋放技能手勢成功觸發並進入前搖/後搖動畫時，引擎自動設定鎖定計時器（時間長度依當前選用武器設定）。
-* 在鎖定期間內，引擎會對外廣播 `ON_LOCKOUT` 狀態事件（攜帶 `action` 與 `duration` 等參數），並在內部**屏蔽一切衝突事件**（如禁止射擊與瞄準）。
-* 該鎖定機制**在 `GAME` 與 `DEBUG` 模式下同步生效**，確保測試頁中能完美體驗真實關卡中的動作鎖定手感。
+### 3. 動態數據驅動鎖定 (Data-Driven Dynamic Lockout Matrix)
+* **解耦觸發機制**：手勢引擎本身**不主動**觸發鎖定（以防止 CD 期間比手勢觸發鎖定 Bug）。所有鎖定改由 [`PlayerController.js`](file:///d:/06-程式/02_Html/02_FingerGundown/src/game/PlayerController.js) 監聽事件，並在武器成功施放（`onAction` 回傳 `true`，代表非 CD 且資源足夠）後，呼叫 `gestureEngine.startAnimationLock`。
+* **自訂鎖定矩陣**：鎖定陣列完全由常數配置檔驅動。每項武器的 `reload`、`skill`、`ult` 均在 [`WeaponConfig.js`](file:///d:/06-程式/02_Html/02_FingerGundown/src/core/WeaponConfig.js) 中自訂 `lockout` 陣列（如步槍大招僅鎖定 `['move', 'reload']`，而保留 `aim` 與 `fire` 正常運作）。
+* **按鍵/卡片狀態對應**：引擎在鎖定期間會向外廣播 `ON_LOCKOUT` 事件（攜帶 `suppressedActions` 陣列）。UI 面板與手勢解析會依此陣列自動過濾並置灰對應的手勢卡片。
 
 ---
 
@@ -281,18 +282,29 @@ UI 排版必須能動態適配各種螢幕高度（縱向排版為主），且�
 * **BaseWeapon 與具體武器繼承**：武器統一繼承自 [BaseWeapon.js](file:///d:/06-程式/02_Html/02_FingerGundown/src/game/weapons/BaseWeapon.js), 實現冷卻時間計時、換彈計時、開鏡倍率與核心能量狀態在基類自動運作，避免子類代碼重複。各別武器子類只實現自定義的發射物或技能效果（例如 `PistolWeapon`, `RifleWeapon`, `SniperWeapon`, `KatanaWeapon`, `BloodMagicWeapon`, `CrimsonClanWeapon`）。
 * **實時暫停同步**：在 `PlayerController.js` 的 `update(deltaTime)` 首影格檢測 `localStorage` 中儲存的 `gesture_selected_weapon` 指標。當玩家於暫停狀態下的武器頁切換選擇並點選 Resume 返回遊戲後，控制器會立刻捕獲差異並重置加載新武器實例，技能格與冷卻資訊在 1 幀內完成刷新，無縫銜接戰鬥。
 
-### 6. 組件化飛射物生成架構 (Modular Projectile Composition System)
-* **標準配置結構**：武器發射物（以三種槍的主射擊 `fire` 為主）改為配置驅動的組件化結構。在 `WeaponConfig.js` 中使用 `projectiles` 陣列儲存物件資訊，包含：
-  * `shape`：形狀與尺寸幾何參數（如 `type: 'cylinder'`, `radius: 0.1`, `length: 60.0`, `pivot: 'start'`）。
-  * `motion`：運動動畫控制（如 `type: 'linear', speed: 80.0` 或 `type: 'stationary'`）。
-  * `collision`：碰撞與傷害模式（如 `type: 'impact'` 或 `type: 'once_per_target'`）。
-  * `duration` (毫秒) 與 `delay` (毫秒)：表示飛射物的主動存活期與啟動前的等待時差。
-  * `color` 與 `opacity`：控制飛射物的外觀材質渲染。
-* **底層 ActionHelper 自動補全與延遲**：
+### 6. 組件化飛射物生成與資料驅動架構 (Modular Projectile & Data-driven System)
+* **標準配置結構**：武器發射物改為配置驅動的組件化結構。在 `WeaponConfig.js` 中使用 `projectiles` 陣列儲存物件資訊，並完整支援以下核心擴展：
+  * **幾何形狀 (`shape`)**：支援 `sphere`, `cylinder`, `cone`, `aoe_group`, 以及 `box`（長方形）。
+    * `box` 形狀包含 `width` (寬), `length` (長), `height` (高) 屬性。
+    * 支援 `orientation: 'vertical'`（底部切齊地面 Y = 0，繞過預設前向旋轉，適用於地刺、火區等地面 AoE 貼平需求）。
+    * 支援 `pivot: 'start'`（起點前移對齊，使地刺或障礙物自投掷落點向前蔓延）。
+  * **動態索敵 (`targeting`)**：在拋物線投射（如手雷、地刺、燃燒瓶）的子彈配置中加入，包含 `fovAngle`, `minDistance`, `maxDistance`，投出時由 `ActionHelper.findNearestEnemy` 自動在特定角度與距離內取得敵人的地面位置作為落點。
+  * **狀態效果 (`collision.statusEffects`)**：在碰撞區塊中定義，為敵人套用動態 Debuff。
+    * 支援 `slow`（數值減速，如燃燒彈 0.5 減速 1 秒；地刺 1.0 減速 3 秒實現完全停滯，期間敵人的動作速度與受擊退滑行距離按比例縮減）。
+    * 支援 `time_slow`（時空減慢，如 Sniper 大招時空力場 0.7 減速 1 秒。敵人進入此力場後會進入慢動作，所有 update Lifecycle 乘以 `0.3` 慢動作流速，但 Debuff 時效仍依真實時間遞減以防時間停滯死鎖）。
+  * **動態鎖定矩陣 (`lockout`)**：在每個 Action 外層配置，指定被禁用的手勢功能（如 `['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move']`）。控制器會在 Action 成功執行後動態啟動對應鎖定。
+  * **被動核心參數 (`passive`)**：在武器最外層配置，儲存該武器的機制變數，包括 `maxBullets`（最大彈藥量）、`coreLabel`（HUD 核心指示器名稱如「爐心溫度」、「彈藥」）、`coreSuffix`（數值後綴如「%」或空字串）、`heatPerShot`、`heatDecayRate`（自然降溫率）等，使 HUD 指示器與武器基底在運行時完全配置化。
+* **底層 ActionHelper 自動補全與局部 OBB 碰撞**：
   * **碰撞簡化繼承**：如果 `collision` 物件中省略了 `shape`、`length` 或 `radius`，底層 `ActionHelper.js` 會自動讀取最外層 `shape` 的同名屬性作為備用參數，防止配置冗餘。
-  * **啟動延遲控制**：在延遲階段（`elapsed < delay`）時，Mesh 將保持 `visible = false` 且不執行任何運動或碰撞計算；脈衝縮放或 AOE tick 計時改以 `elapsed - delay` 相對時間計算，解決畫面出現殘影或提早判定傷害的問題。
+  * **OBB 方向包圍盒相交檢測**：對於長方形（`box`）碰撞，系統會自動將敵人的 3D 世界座標投影至投射物 Mesh 的局部空間坐標系（利用 `matrixWorld` 的逆矩陣變換），藉此計算局部 X 與 Z 軸邊界是否重疊，實現隨玩家拋擲方向動態對齊的長方形區域碰撞判定。
+  * **啟動延遲控制**：在延遲階段（`elapsed < delay`）時，Mesh 將保持 `visible = false` 且不執行 any 運動或碰撞計算；脈衝縮放或 AOE tick 計時改以 `elapsed - delay` 相對時間計算，解決畫面出現殘影或提早判定傷害的問題。
 
 ### 7. 戰術開鏡瞄準防抖與動態錨點重置 (Tactical Zoom Scoping & Dynamic Center Anchoring)
-* **滑動平均手勢濾波 (Sliding Window Moving Average Filter)**：絕對定位映射下，當手勢位於畫面邊緣或人體生理疲勞時，Webcam 所得的 MediaPipe 手部坐標會產生強烈的高頻雜訊。系統使用一個 5 影格的滑動歷史隊列（`aimHandHistory`）均攤手部座標，搭配恆定中速 `followSpeed = 8.0` 進行相機朝向插值。如此能使單影格的劇烈訊號跳變僅佔 1/5 的低比重，徹底消除高倍鏡微調時的生硬抖動與操作延遲。
+* **滑動平均手勢濾波 (Sliding Window Moving Average Filter)**：絕對定位映射下，當手勢位於畫面邊緣或人體生理疲勞時，Webcam 所得的 MediaPipe 手部坐標會產生強烈的高頻雜訊。系統使用一個 5 影格的滑動歷史隊列（`aimHandHistory`）均攤手部座標，搭配恆定中速 `followSpeed = 8.0` 進行相機朝向插值。如此能使影格的劇烈訊號跳變僅佔 1/5 的低比重，徹底消除高倍鏡微調時的生硬抖動與操作延遲。
 * **動態中心錨點調整 (Dynamic Center Anchoring)**：由於開鏡瞄準時，相機水平與垂直的可偏轉上限（`effectiveMaxYaw` / `Pitch`）會隨著 FOV 縮放而按比例收縮。此時若右手偏離螢幕中心，尺規收縮會導致視角的目標角度發生突變，引發鏡頭無故平移（Drift）。系統在 `update` 的縮放插值期間，計算前後影格的邊界比率，按比例縮放當前 Yaw 偏移量的同時，**反向補償基底中心朝向**（$\text{aimCenterYaw}_{\text{new}} = (\text{aimCenterYaw}_{\text{old}} + \text{aimYawOffset}_{\text{old}}) - \text{aimYawOffset}_{\text{new}}$）。這可確保改變放大倍率時，鏡頭畫面所鎖定的 3D 空間目標絕對靜止。
 * **無縫關鏡還原 (Zero-Snap Return Transition)**：為防止關鏡時相機因為動態錨點微調過後的偏差產生瞬間跳躍（Snap），關鏡瞬間首先將基底 `yaw` 設為出鏡時的實際中心 `aimCenterYaw` 以達到 0 突變過渡。隨後在非開鏡狀態下，使 `aimYawOffset` 與 `aimPitchOffset` 以 `restoreSpeed = 4.0` 緩緩歸零，並同步將基底 `this.yaw` 平滑插值回最一開始進鏡時的原始朝向 `aimStartYaw`。若玩家在回彈過程中輸入了手動 steering 控制，則立刻取消自動歸位程序以防操控對抗。
+
+### 8. 被動核心系統與換彈防護機制 (Passive Cores & Scoping Reload Guarding)
+* **擊殺返彈被動核心 (Kill-Refund Core)**：當發射物或法陣擊中敵人致死時，`BaseEnemy.takeDamage` 會傳回 `true` 代表死亡觸發，並由 `ActionHelper` 向武器廣播 `onEnemyKilled()`。狙擊槍可在開鏡瞄準狀態下，監聽此事件並自動為彈夾補回 1 發子彈。
+* **開鏡換彈防護門檻 (Scoping Reload Guard)**：為了防止子彈數打光（歸 0）時強制退出瞄準開鏡視角進行裝填，裝有高倍鏡的武器（如 AMR 反坦克步槍）在開鏡瞄準期間**不會自動觸發換彈**。玩家可以安心保持瞄準狀態，等待飛行中的子彈命中敵人並觸發「擊殺返彈」被動；只有在未擊殺且玩家「再次嘗試點火」時，發現彈藥依然為 0，才會正式啟動手動裝填並退出瞄準模式。
+* **移動鎖定解耦機制 (Decoupled Movement Lockout)**：為防止大招期間武器控制與玩家移動產生衝突，`PlayerController` 不再採用硬編碼來禁用移動，而是全面監聽 `app.gestureEngine.isActionBlocked('move')`。只有在技能動態禁用矩陣中含有 `'move'` 的 Action 釋放時，移動才會被阻斷；這確保了如 AMR 步槍大招期間，即使大招開啟，玩家依然能維持 100% 速度自由走位射擊。

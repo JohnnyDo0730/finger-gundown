@@ -48,12 +48,18 @@ export class WeaponsView extends BaseView {
   formatDescription(descTemplate, actionObj, weaponObj) {
     if (!descTemplate) return '';
     return descTemplate.replace(/\{(\w+)\}/g, (match, key) => {
-      if (actionObj && actionObj[key] !== undefined) {
-        const val = actionObj[key];
-        if ((key === 'cooldown' || key === 'chargeTime' || key === 'duration' || key === 'animationTime') && typeof val === 'number') {
-          return val >= 100 ? (val / 1000).toFixed(1).replace(/\.0$/, '') : val;
+      if (actionObj) {
+        let val = actionObj[key];
+        // Dynamic fallback: if damage is not defined at the outer level, try retrieval from first projectile
+        if (val === undefined && key === 'damage' && actionObj.projectiles && actionObj.projectiles[0]) {
+          val = actionObj.projectiles[0].collision?.damage;
         }
-        return val;
+        if (val !== undefined) {
+          if ((key === 'cooldown' || key === 'chargeTime' || key === 'duration' || key === 'animationTime') && typeof val === 'number') {
+            return val >= 100 ? (val / 1000).toFixed(1).replace(/\.0$/, '') : val;
+          }
+          return val;
+        }
       }
       if (weaponObj && weaponObj[key] !== undefined) {
         const val = weaponObj[key];

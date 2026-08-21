@@ -245,28 +245,54 @@ export class PlayerController {
       this.app.gestureEngine.addEventListener('ON_RELOAD', () => {
         if (!this.isGameplayActive()) return;
         if (this.equippedWeapon) {
-          this.equippedWeapon.onAction('reload', this.getContext());
+          const success = this.equippedWeapon.onAction('reload', this.getContext());
+          if (success) {
+            const actConfig = this.equippedWeapon.config.hiveActions.reload;
+            const lockTime = actConfig.animationTime || 2000;
+            const lockoutList = actConfig.lockout || [];
+            this.app.gestureEngine.startAnimationLock('reload', lockTime, Date.now(), lockoutList);
+          }
         }
       });
 
       this.app.gestureEngine.addEventListener('ON_SLASH', () => {
         if (!this.isGameplayActive()) return;
         if (this.equippedWeapon) {
-          this.equippedWeapon.onAction('slash', this.getContext());
+          const success = this.equippedWeapon.onAction('slash', this.getContext());
+          if (success) {
+            const actConfig = this.equippedWeapon.config.hiveActions.slash;
+            const lockTime = actConfig ? (actConfig.animationTime || 0) : 0;
+            const lockoutList = actConfig ? (actConfig.lockout || []) : [];
+            if (lockTime > 0) {
+              this.app.gestureEngine.startAnimationLock('slash', lockTime, Date.now(), lockoutList);
+            }
+          }
         }
       });
 
       this.app.gestureEngine.addEventListener('ON_SKILL', () => {
         if (!this.isGameplayActive()) return;
         if (this.equippedWeapon) {
-          this.equippedWeapon.onAction('skill', this.getContext());
+          const success = this.equippedWeapon.onAction('skill', this.getContext());
+          if (success) {
+            const actConfig = this.equippedWeapon.config.hiveActions.skill;
+            const lockTime = actConfig.animationTime || 3000;
+            const lockoutList = actConfig.lockout || [];
+            this.app.gestureEngine.startAnimationLock('skill', lockTime, Date.now(), lockoutList);
+          }
         }
       });
 
       this.app.gestureEngine.addEventListener('ON_ULT', () => {
         if (!this.isGameplayActive()) return;
         if (this.equippedWeapon) {
-          this.equippedWeapon.onAction('ult', this.getContext());
+          const success = this.equippedWeapon.onAction('ult', this.getContext());
+          if (success) {
+            const actConfig = this.equippedWeapon.config.hiveActions.ult;
+            const lockTime = actConfig.animationTime || 5000;
+            const lockoutList = actConfig.lockout || [];
+            this.app.gestureEngine.startAnimationLock('ult', lockTime, Date.now(), lockoutList);
+          }
         }
       });
 
@@ -303,8 +329,9 @@ export class PlayerController {
       this.equipWeapon(activeWeaponKey);
     }
 
-    // If ultimate is charging, force-disable movement, steering and lock aiming offsets
-    if (this.isUltCharging) {
+    // If movement is blocked by dynamic gesture engine lockout matrix, or ultimate is charging
+    const isMovementBlocked = this.app.gestureEngine && this.app.gestureEngine.isActionBlocked('move');
+    if (this.isUltCharging || isMovementBlocked) {
       this.moveX = 0;
       this.moveY = 0;
       this.currentSpeed = 0;
