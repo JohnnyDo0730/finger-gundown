@@ -42,6 +42,17 @@ export class SniperWeapon extends BaseWeapon {
     return true;
   }
 
+  /**
+   * ZAWARUDO passive: reduce fire cooldown during ultimate mode.
+   */
+  getCooldownMs(actionKey) {
+    if (actionKey === 'fire' && this.isUltActive) {
+      const ultFireCooldown = this.config.hiveActions?.ult?.ultFireCooldown;
+      if (ultFireCooldown !== undefined) return ultFireCooldown;
+    }
+    return super.getCooldownMs(actionKey);
+  }
+
   onEnemyKilled() {
     // Passive: Under zoom/aiming mode, each time an enemy is killed, refund 1 bullet (up to maxBullets)
     if (this.playerController && this.playerController.isZoomed) {
