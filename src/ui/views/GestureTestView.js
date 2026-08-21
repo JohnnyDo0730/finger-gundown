@@ -37,7 +37,7 @@ export class GestureTestView extends BaseView {
     // Canvas rendering context
     this.canvasEl = null;
     this.ctx = null;
-    
+
     // Bind frame callback to instance
     this.resultsHandler = (results) => this.onResults(results);
 
@@ -45,7 +45,7 @@ export class GestureTestView extends BaseView {
     this.cardStates = {};
     this.isPinchingActive = false;
     this.latestSlash = null;
-    
+
     // Calibration parameters
     this.latestVisionResults = null;
     this.calibrationStep = 0; // 0 = Idle, 1 = TL, 2 = TR, 3 = BL, 4 = BR, 5 = Done
@@ -234,7 +234,7 @@ export class GestureTestView extends BaseView {
     const contrastVal = this.domElement.querySelector('#contrast-val');
     const toggleVideoBtn = this.domElement.querySelector('#btn-toggle-video');
     const toggleSkeletonBtn = this.domElement.querySelector('#btn-toggle-skeleton');
-    
+
     this.canvasEl = this.domElement.querySelector('#test-canvas');
     if (this.canvasEl) {
       this.ctx = this.canvasEl.getContext('2d');
@@ -359,7 +359,7 @@ export class GestureTestView extends BaseView {
     this.moveListener = (data) => {
       const cardId = 'card-left-joystick';
       const isMoving = data.moveX !== 0 || data.moveY !== 0;
-      
+
       // Update joystick canvas knob
       this.drawStaticJoystick(data.moveX, data.moveY);
 
@@ -411,7 +411,7 @@ export class GestureTestView extends BaseView {
       const card = this.domElement.querySelector(`#${cardId}`);
       if (card && !card.classList.contains('disabled-item')) {
         this.cardStates[cardId] = 'danger'; // Turn red on trigger success
-        
+
         // Save visual arrow parameters
         this.latestSlash = {
           dirX: data.dirX,
@@ -493,7 +493,7 @@ export class GestureTestView extends BaseView {
         this.cardStates[cardId] = 'danger';
         const txt = card.querySelector('.card-status-text');
         if (txt) txt.textContent = '暫停遊戲觸發！';
-        
+
         if (card._pauseTimeout) clearTimeout(card._pauseTimeout);
         card._pauseTimeout = setTimeout(() => {
           delete this.cardStates[cardId];
@@ -509,8 +509,8 @@ export class GestureTestView extends BaseView {
           this.cardStates[leftCardId] = 'charging';
           const txt = card.querySelector('.card-status-text');
           if (txt) {
-            txt.textContent = data.type === 'entering' 
-              ? '瞄準模式切換中... (蓄力0.5s)' 
+            txt.textContent = data.type === 'entering'
+              ? '瞄準模式切換中... (蓄力0.5s)'
               : '退出瞄準模式中... (蓄力0.5s)';
           }
         } else {
@@ -934,7 +934,7 @@ export class GestureTestView extends BaseView {
       this.ctx.beginPath();
       this.ctx.arc(p.x * w, p.y * h, 4.5, 0, Math.PI * 2);
       this.ctx.fill();
-      
+
       this.ctx.strokeStyle = color;
       this.ctx.lineWidth = 1.5;
       this.ctx.beginPath();
