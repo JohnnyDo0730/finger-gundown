@@ -147,7 +147,12 @@ export const WeaponConfig = {
     passive: {
       name: '爐心溶解',
       description: '配備無限能源電池，不需擔心備彈，但每次發射皆會累積熱能。連續快速射擊會導致武器過熱，需手動執行過載冷卻以加速排熱，否則過熱時會自動強制換彈，且換彈時間會加倍為 {reloadOverheatTime} 秒。',
-      reloadOverheatTime: 4.0
+      reloadOverheatTime: 4.0,
+      maxBullets: 100,
+      coreLabel: '爐心溫度',
+      coreSuffix: '%',
+      heatPerShot: 20.0,
+      heatDecayRate: 15.0
     },
     hiveActions: {
       'fire': {
@@ -174,7 +179,8 @@ export const WeaponConfig = {
         desc: '主動開啟散熱閥，在 {duration} 秒裝填時間內快速排出核心熱能並重置過載。',
         duration: 2000,
         chargeTime: 1500,
-        animationTime: 2000
+        animationTime: 2000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'skill', 'ult']
       },
       'aim': {
         name: '紅點瞄準鏡',
@@ -190,24 +196,26 @@ export const WeaponConfig = {
         desc: '此槍械武器不支援近戰揮舞。'
       },
       'skill': {
-        name: '手榴彈',
+        name: '脈衝手榴彈',
         active: true,
         desc: '軍人必備！蓄力 {chargeTime} 秒拋出電磁脈衝手榴彈，對範圍內敵人造成 {damage} 點巨大衝擊傷害並以中心點強力擊退目標，冷卻 {cooldown} 秒。',
         cooldown: 5000,
         damage: 50,
         chargeTime: 1500,
         animationTime: 1000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move'],
         projectiles: [
           {
             shape: { type: 'sphere', radius: 0.3 },
             motion: { type: 'parabolic' },
             collision: { type: 'none' },
+            targeting: { fovAngle: 30.0, minDistance: 10.0, maxDistance: 50.0 },
             duration: 1000, // Dynamic fly duration calculated in code
             color: 0x00aaff,
             opacity: 1.0
           },
           {
-            shape: { type: 'sphere', radius: 4.0 },
+            shape: { type: 'sphere', radius: 6.0 },
             motion: { type: 'stationary_pulsing', cycles: 0.5 },
             collision: { type: 'once_per_target', damage: 50, knockbackStrength: 8.0 },
             duration: 2000,
@@ -225,6 +233,7 @@ export const WeaponConfig = {
         damage: 25,
         chargeTime: 1500,
         animationTime: 6000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move'],
         projectiles: [
           {
             shape: { type: 'cylinder', radius: 1.2, length: 0.1 },
@@ -255,7 +264,10 @@ export const WeaponConfig = {
     description: '中距離全自動突擊步槍，射速快且射擊穩定度適中，適合在移動中進行持續壓制火力輸出。',
     passive: {
       name: '準心校正',
-      description: '射擊模式下自動啟動輔助射擊陀螺儀，射擊時獲得微幅自動追蹤或準心跟隨效果，提升掃射準確度。'
+      description: '射擊模式下自動啟動輔助射擊陀螺儀，射擊時獲得微幅自動追蹤或準心跟隨效果，提升掃射準確度。',
+      maxBullets: 30,
+      coreLabel: '彈藥',
+      coreSuffix: ''
     },
     hiveActions: {
       'fire': {
@@ -281,7 +293,8 @@ export const WeaponConfig = {
         desc: '更換特製的高容量擴容彈匣，裝填耗時 {duration} 秒，大幅增加彈藥續航力。',
         duration: 2000,
         chargeTime: 500,
-        animationTime: 2000
+        animationTime: 2000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'skill', 'ult']
       },
       'aim': {
         name: '伸縮倍鏡',
@@ -301,32 +314,56 @@ export const WeaponConfig = {
         active: true,
         desc: '便宜好做，平民神器！蓄力 {chargeTime} 秒拋出簡易燃燒瓶，在區域內造成持續燃燒傷害，並減速敵人 50%，冷卻 {cooldown} 秒。',
         cooldown: 5000,
-        damage: 15,
-        type: 'stationary',
-        radius: 5.0,
-        duration: 3000,
-        rotateSpeed: 1.5,
-        pulseSpeed: 4.0,
-        tickInterval: 500,
-        color: 0xff7700,
-        chargeTime: 1000,
-        animationTime: 3000
+        damage: 20,
+        chargeTime: 1500,
+        animationTime: 1000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move'],
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 0.25 },
+            motion: { type: 'parabolic' },
+            collision: { type: 'none' },
+            targeting: { fovAngle: 30.0, minDistance: 10.0, maxDistance: 50.0 },
+            duration: 1000, // Dynamic fly duration calculated in code
+            color: 0xff5500,
+            opacity: 1.0
+          },
+          {
+            shape: { type: 'cylinder', radius: 4.5, length: 0.1, orientation: 'vertical' },
+            motion: { type: 'stationary' },
+            collision: {
+              type: 'aoe',
+              damage: 15,
+              tickInterval: 500,
+              knockbackStrength: 0.0,
+              statusEffects: [{ type: 'slow', value: 0.5, duration: 1000 }]
+            },
+            duration: 5000,
+            delay: 1000, // Dynamic delay matching fly duration
+            color: 0xff5500,
+            opacity: 0.4
+          }
+        ]
       },
       'ult': {
         name: 'MG3讓遊戲變簡單',
         active: true,
         desc: '從不知道哪裡掏出來的 MG3。蓄力 {chargeTime} 秒後進入重裝火力壓制狀態。期間無法移動，子彈無限，射速加倍，且大招持續 {duration} 秒，冷卻 {cooldown} 秒。',
-        cooldown: 35000,
-        damage: 20,
-        type: 'stationary',
-        radius: 12.0,
-        duration: 30000,
-        rotateSpeed: 1.0,
-        pulseSpeed: 2.0,
-        tickInterval: 150,
-        color: 0xffaa00,
+        cooldown: 30000,
         chargeTime: 1500,
-        animationTime: 5000
+        animationTime: 10000, // 10.0 seconds duration
+        lockout: ['move', 'reload'],
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 0.2 },
+            motion: { type: 'linear', speed: 65.0 },
+            collision: { type: 'impact', damage: 10, knockbackStrength: 2.0 },
+            duration: 3000,
+            color: 0x708090, // slateGray
+            opacity: 0.9,
+            cooldown: 30
+          }
+        ]
       }
     }
   },
@@ -338,15 +375,18 @@ export const WeaponConfig = {
     description: '高能反物資穿甲步槍，具備超遠射程與毀滅性單發傷害，但射擊間隔極長且需要更長的裝填冷卻。',
     passive: {
       name: '無限續杯',
-      description: '在瞄準模式下，每擊殺一名敵人會立即返還一枚子彈，並自動填入彈夾。'
+      description: '在瞄準模式下，每擊殺一名敵人會立即返還一枚子彈，並自動填入彈夾。',
+      maxBullets: 10,
+      coreLabel: '彈藥',
+      coreSuffix: ''
     },
     hiveActions: {
       'fire': {
         name: '精準射擊',
         active: true,
         desc: '單發發射超高動能穿甲彈，具備毀滅性的 {damage} 點單發傷害，冷卻間隔 {cooldown} 秒。',
-        cooldown: 2000,
-        damage: 100,
+        cooldown: 1500,
+        damage: 120,
         projectiles: [
           {
             shape: { type: 'cylinder', radius: 0.1, length: 1.4 },
@@ -362,9 +402,9 @@ export const WeaponConfig = {
         name: '狙擊槍擴容彈夾',
         active: true,
         desc: '手動裝填重型穿甲彈藥，裝填需耗時 {duration} 秒。單發威力巨大但攜彈量極度有限。',
-        duration: 2000,
+        duration: 3000,
         chargeTime: 500,
-        animationTime: 2000
+        animationTime: 3000
       },
       'aim': {
         name: '伸縮高倍鏡',
@@ -384,32 +424,60 @@ export const WeaponConfig = {
         active: true,
         desc: '向前方中距離拋出地刺陷阱，對範圍內敵人造成單次 {damage} 點小額傷害，並使敵人停滯，冷卻 {cooldown} 秒。',
         cooldown: 5000,
-        damage: 5,
-        type: 'stationary',
-        radius: 6.0,
-        duration: 4000,
-        rotateSpeed: 0.5,
-        pulseSpeed: 2.0,
-        tickInterval: 1000,
-        color: 0xbd00ff,
-        chargeTime: 1000,
-        animationTime: 3000
+        chargeTime: 1500,
+        animationTime: 1000,
+        lockout: ['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move'],
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 0.25 },
+            motion: { type: 'parabolic' },
+            collision: { type: 'none' },
+            targeting: { fovAngle: 30.0, minDistance: 10.0, maxDistance: 50.0 },
+            duration: 1000,
+            color: 0x555555,
+            opacity: 1.0
+          },
+          {
+            shape: { type: 'box', width: 15.0, length: 3.0, height: 0.1, orientation: 'vertical' },
+            motion: { type: 'stationary' },
+            collision: {
+              type: 'once_per_target',
+              damage: 20,
+              knockbackStrength: 0.0,
+              statusEffects: [{ type: 'slow', value: 1.0, duration: 3000 }]
+            },
+            duration: 4000,
+            delay: 1000,
+            color: 0x555555,
+            opacity: 0.8
+          }
+        ]
       },
       'ult': {
         name: 'ZAWARUDO',
         active: true,
         desc: '「ZA WARUDO！」使時間流速變慢。雙手蓄力 {chargeTime} 秒後啟動時空暫停力場，減緩場上所有敵人的動作，持續 {duration} 秒，冷卻 {cooldown} 秒。',
         cooldown: 25000,
-        damage: 0,
-        type: 'stationary',
-        radius: 18.0,
-        duration: 15000,
-        rotateSpeed: 5.0,
-        pulseSpeed: 8.0,
-        tickInterval: 250,
-        color: 0x00ffff,
         chargeTime: 1500,
-        animationTime: 5000
+        animationTime: 1000,
+        duration: 5000,
+        lockout: ['slash', 'skill', 'ult'],
+        projectiles: [
+          {
+            shape: { type: 'sphere', radius: 30.0 },
+            motion: { type: 'stationary' },
+            collision: {
+              type: 'aoe',
+              damage: 0,
+              tickInterval: 500,
+              knockbackStrength: 0.0,
+              statusEffects: [{ type: 'time_slow', value: 0.7, duration: 1000 }]
+            },
+            duration: 10000,
+            color: 0x00ffff,
+            opacity: 0.2
+          }
+        ]
       }
     }
   },

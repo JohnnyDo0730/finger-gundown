@@ -71,7 +71,12 @@ export class GestureEngine {
     this.calib_yMin = 0.20;
     this.calib_yMax = 0.80;
 
+    this.blockedActions = [];
     this.loadCalibrationData();
+  }
+
+  isActionBlocked(actionName) {
+    return this.isLockoutActive && this.blockedActions && this.blockedActions.includes(actionName);
   }
 
   /**
@@ -95,6 +100,7 @@ export class GestureEngine {
     this.states.skill = false;
     this.states.ult = false;
     this.states.syncAim = false;
+    this.blockedActions = [];
   }
 
   /**
@@ -208,26 +214,28 @@ export class GestureEngine {
     return false;
   }
 
-  startAnimationLock(name, duration, timestamp) {
+  startAnimationLock(name, duration, timestamp, customBlockedActions = null) {
     if (duration > 0) {
       this.animationLockEnd = timestamp + duration;
       this.activeAnimationName = name;
       this.isLockoutActive = true;
 
-      // Match old project rules: Reload locks ranged weapons, skills, and ults; Skills/Ults lock all actions.
-      const blocked = name === 'reload'
+      // Use custom blocked actions list if provided, fallback to default rules
+      const defaultBlocked = name === 'reload'
         ? ['aim', 'fire', 'reload', 'sync_aim', 'skill', 'ult']
         : ['aim', 'fire', 'reload', 'sync_aim', 'slash', 'skill', 'ult', 'move'];
+
+      this.blockedActions = customBlockedActions || defaultBlocked;
 
       this.emit('ON_LOCKOUT', {
         action: name,
         active: true,
         duration: duration,
         endTime: this.animationLockEnd,
-        suppressedActions: blocked
+        suppressedActions: this.blockedActions
       });
 
-      console.log(`[GestureEngine] Dynamic lockout: ${name} locked for ${duration}ms`);
+      console.log(`[GestureEngine] Dynamic lockout: ${name} locked for ${duration}ms, blocked: ${this.blockedActions.join(', ')}`);
     }
   }
 
@@ -247,13 +255,12 @@ export class GestureEngine {
       });
       console.log(`[GestureEngine] Dynamic lockout released: ${this.activeAnimationName}`);
       this.activeAnimationName = '';
+      this.blockedActions = [];
     }
-
-    const isLocked = this.isLockoutActive;
 
     // 1. Process Dual-Hand Tactical Sync Aim Scoping
     let isSyncAiming = false;
-    if (leftHand && this.isGestureAllowed('sync_aim') && !isLocked) {
+    if (leftHand && this.isGestureAllowed('sync_aim') && !this.isActionBlocked('sync_aim')) {
       isSyncAiming = this.evaluateLeftHandAim(leftHand, rightHand, timestamp);
     } else {
       if (this.states.syncAim) {
@@ -276,7 +283,7 @@ export class GestureEngine {
       }
 
       // Joystick Movement (Frozen during skill/ult casting lockouts or sync-aiming)
-      const isMovementFrozen = isLocked && (this.activeAnimationName === 'skill' || this.activeAnimationName === 'ult');
+      const isMovementFrozen = this.isActionBlocked('move');
       if (this.isGestureAllowed('move') && !isMovementFrozen && !isSyncAiming) {
         const moveVector = this.evaluateLeftHandMove(leftHand);
         this.emit('ON_MOVE', moveVector);
@@ -289,7 +296,7 @@ export class GestureEngine {
     }
 
     // 3. Process Dual-Hand Sync Ultimate (Triangle gesture)
-    if (this.isGestureAllowed('ult')) {
+    if (this.isGestureAllowed('ult') && !this.isActionBlocked('ult')) {
       this.evaluateSyncUlt(leftHand, rightHand, timestamp);
     }
 
@@ -314,7 +321,20 @@ export class GestureEngine {
             Math.pow(thumbTip.x - indexTip.x, 2) + 
             Math.pow(thumbTip.y - indexTip.y, 2)
           );
-          isPinching = distThumbIndex < 0.035;
+          
+          // Anti-misfire check: hand must be open (middle or ring finger extended straight)
+          const wrist = rightHand[0];
+          const middleTip = rightHand[12];
+          const middlePip = rightHand[10];
+          const ringTip = rightHand[16];
+          const ringPip = rightHand[14];
+          const getDistance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+
+          const isMiddleStraight = wrist && middleTip && middlePip && getDistance(middleTip, wrist) > getDistance(middlePip, wrist) * 1.15;
+          const isRingStraight = wrist && ringTip && ringPip && getDistance(ringTip, wrist) > getDistance(ringPip, wrist) * 1.15;
+          const isHandOpen = isMiddleStraight || isRingStraight;
+
+          isPinching = distThumbIndex < 0.035 && isHandOpen;
         }
 
         // Apply Exponential Smoothing & Pinch Lock-Assist
@@ -332,7 +352,7 @@ export class GestureEngine {
         }
 
         // Broadcast smoothed coordinate
-        if (!isLocked) {
+        if (!this.isActionBlocked('aim')) {
           this.emit('ON_AIM', {
             active: true,
             wristX: this.smoothedRightIndex.x,
@@ -343,7 +363,7 @@ export class GestureEngine {
         }
 
         // Broadcast Pinch clicks (blocked during dynamic lockouts)
-        if (this.isGestureAllowed('fire') && !isLocked) {
+        if (this.isGestureAllowed('fire') && !this.isActionBlocked('fire')) {
           this.emit('ON_FIRE', { active: isPinching, force: 1.0 });
         } else {
           this.emit('ON_FIRE', { active: false });
@@ -354,9 +374,7 @@ export class GestureEngine {
       }
 
       // B. Process Weapon Reload & Melee Slashes
-      if (!isLocked) {
-        this.evaluateRightHandWeapons(rightHand, timestamp);
-      }
+      this.evaluateRightHandWeapons(rightHand, timestamp);
     } else {
       this.smoothedRightIndexInitialized = false;
       if (this.states.reload) {
@@ -604,7 +622,7 @@ export class GestureEngine {
     if (!wrist) return;
 
     // A. Evaluate Skill Uppercut Charge (Allowed in ranged/melee)
-    if (this.isGestureAllowed('skill')) {
+    if (this.isGestureAllowed('skill') && !this.isActionBlocked('skill')) {
       this.evaluateRightHandSkill(landmarks, timestamp);
     }
 
@@ -616,7 +634,7 @@ export class GestureEngine {
     const indexKnuckle = landmarks[5];
     const indexPip = landmarks[6];
 
-    if (this.isGestureAllowed('reload') && thumbBase && pinkyKnuckle && indexKnuckle && indexTip && indexPip) {
+    if (this.isGestureAllowed('reload') && !this.isActionBlocked('reload') && thumbBase && pinkyKnuckle && indexKnuckle && indexTip && indexPip) {
       const isHandFlipped = thumbBase.x < pinkyKnuckle.x - 0.02;
       const isReloadIndexStraight = getDistance(indexTip, wrist) > getDistance(indexPip, wrist) * 1.15;
       const isReloadTriggered = isHandFlipped && isReloadIndexStraight;
@@ -637,9 +655,6 @@ export class GestureEngine {
             this.chargeStarts.reload = 0;
             this.states.reload = false;
             this.emit('ON_RELOAD_STATE', { active: false });
-            
-            const lockTime = weapon.hiveActions?.reload?.animationTime || ActionConfig['right-reload']?.animationTime || 2000;
-            this.startAnimationLock('reload', lockTime, timestamp);
           }
         }
       } else {
@@ -748,9 +763,6 @@ export class GestureEngine {
           this.chargeStarts.skill = 0;
           this.states.skill = false;
           this.emit('ON_SKILL_STATE', { active: false });
-
-          const lockTime = weapon.hiveActions?.skill?.animationTime || ActionConfig['right-skill']?.animationTime || 3000;
-          this.startAnimationLock('skill', lockTime, timestamp);
         }
       }
     } else {
@@ -808,9 +820,6 @@ export class GestureEngine {
           this.chargeStarts.ult = 0;
           this.states.ult = false;
           this.emit('ON_ULT_STATE', { active: false });
-
-          const lockTime = weapon.hiveActions?.ult?.animationTime || ActionConfig['right-sync-ult']?.animationTime || 5000;
-          this.startAnimationLock('ult', lockTime, timestamp);
         }
       }
     } else {

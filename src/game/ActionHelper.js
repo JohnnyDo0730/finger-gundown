@@ -32,9 +32,26 @@ export class ActionHelper {
       geo = new THREE.SphereGeometry(config.shape.radius, 8, 8);
     } else if (config.shape.type === 'cylinder') {
       geo = new THREE.CylinderGeometry(config.shape.radius, config.shape.radius, config.shape.length, 8);
-      geo.rotateX(Math.PI / 2); // Orient length along negative Z
-      if (config.shape.pivot === 'start') {
-        geo.translate(0, 0, config.shape.length / 2); // Shift geometry to align pivot to start (positive Z shifts it forward)
+      if (config.shape.orientation === 'vertical') {
+        // Shift geometry up so the bottom face sits at Y = 0 (perfect ground alignment)
+        geo.translate(0, config.shape.length / 2, 0);
+      } else {
+        geo.rotateX(Math.PI / 2); // Orient length along negative Z (default forward)
+        if (config.shape.pivot === 'start') {
+          geo.translate(0, 0, config.shape.length / 2); // Shift geometry to align pivot to start
+        }
+      }
+    } else if (config.shape.type === 'box') {
+      const w = config.shape.width || 1.0;
+      const h = config.shape.height || 0.1;
+      const d = config.shape.length || 1.0;
+      geo = new THREE.BoxGeometry(w, h, d);
+      if (config.shape.orientation === 'vertical') {
+        geo.translate(0, h / 2, 0); // Bottom rests on ground Y=0
+      } else {
+        if (config.shape.pivot === 'start') {
+          geo.translate(0, 0, d / 2);
+        }
       }
     } else if (config.shape.type === 'cone') {
       geo = new THREE.ConeGeometry(config.shape.radius, config.shape.length, 8);
@@ -123,6 +140,8 @@ export class ActionHelper {
         : new THREE.Vector3(0, 0, -1);
       collision.length = collision.length || config.shape.length || 0;
       collision.radius = collision.radius || config.shape.radius || 0;
+      collision.width = collision.width || config.shape.width || 0;
+      collision.pivot = collision.pivot || config.shape.pivot || 'center';
       collision.shape = collision.shape || config.shape.type;
     } else if (collision.type === 'aoe') {
       collision.lastTickTime = -99.0;
@@ -133,7 +152,9 @@ export class ActionHelper {
         : new THREE.Vector3(0, 0, -1);
       collision.length = collision.length || (config.shape ? config.shape.length : 0);
       collision.radius = collision.radius || (config.shape ? config.shape.radius : 0);
-      collision.shape = collision.shape || (config.shape ? config.shape.type : 'sphere');
+      collision.width = collision.width || (config.shape ? config.shape.width : 0);
+      collision.pivot = collision.pivot || (config.shape ? config.shape.pivot : 'center');
+      collision.shape = collision.shape || config.shape.type;
     }
 
     this.projectiles.push({
@@ -146,6 +167,24 @@ export class ActionHelper {
     });
 
     return mesh;
+  }
+
+  /**
+   * Helper to deal damage, apply status effects, and notify weapon of enemy death.
+   */
+  applyDamageAndEffects(enemy, col, knockbackVector) {
+    const killed = enemy.takeDamage(col.damage, knockbackVector);
+    if (col.statusEffects) {
+      col.statusEffects.forEach(effect => {
+        enemy.applyDebuff(effect.type, effect.value, effect.duration);
+      });
+    }
+    if (killed && this.gameWorld.playerController && this.gameWorld.playerController.equippedWeapon) {
+      const weapon = this.gameWorld.playerController.equippedWeapon;
+      if (typeof weapon.onEnemyKilled === 'function') {
+        weapon.onEnemyKilled();
+      }
+    }
   }
 
   /**
@@ -322,8 +361,8 @@ export class ActionHelper {
               const targetCenter = enemy.mesh.position.clone().add(new THREE.Vector3(0, enemy.height / 2, 0));
               kbDir.copy(targetCenter.sub(proj.mesh.position));
             }
-            const kbVec = kbDir.normalize().multiplyScalar(col.knockbackStrength || 3.0);
-            enemy.takeDamage(col.damage, kbVec);
+            const kbVec = kbDir.normalize().multiplyScalar(col.knockbackStrength !== undefined ? col.knockbackStrength : 3.0);
+            this.applyDamageAndEffects(enemy, col, kbVec);
             hit = true;
             break;
           }
@@ -355,6 +394,20 @@ export class ActionHelper {
               if (dist <= colRadius + enemy.width / 2) {
                 isInside = true;
               }
+            } else if (col.shape === 'box' || col.shape === 'rectangle') {
+              const localPos = enemy.mesh.position.clone().applyMatrix4(new THREE.Matrix4().copy(proj.mesh.matrixWorld).invert());
+              const halfW = col.width / 2;
+              const isInsideX = (localPos.x >= -halfW && localPos.x <= halfW);
+              let isInsideZ = false;
+              if (col.pivot === 'start') {
+                isInsideZ = (localPos.z >= 0 && localPos.z <= col.length);
+              } else {
+                const halfL = col.length / 2;
+                isInsideZ = (localPos.z >= -halfL && localPos.z <= halfL);
+              }
+              if (isInsideX && isInsideZ) {
+                isInside = true;
+              }
             } else {
               const dist = enemy.mesh.position.distanceTo(projPos);
               if (dist <= colRadius + enemy.width / 2) {
@@ -364,8 +417,8 @@ export class ActionHelper {
 
             if (isInside) {
               const kbDir = col.direction ? col.direction.clone() : enemy.mesh.position.clone().sub(projPos);
-              const knockback = kbDir.setY(0).normalize().multiplyScalar(col.knockbackStrength || 2.5);
-              enemy.takeDamage(col.damage, knockback);
+              const knockback = kbDir.setY(0).normalize().multiplyScalar(col.knockbackStrength !== undefined ? col.knockbackStrength : 2.5);
+              this.applyDamageAndEffects(enemy, col, knockback);
             }
           });
         }
@@ -391,6 +444,20 @@ export class ActionHelper {
             if (dist <= colRadius + enemy.width / 2) {
               isIntersecting = true;
             }
+          } else if (col.shape === 'box' || col.shape === 'rectangle') {
+            const localPos = enemy.mesh.position.clone().applyMatrix4(new THREE.Matrix4().copy(proj.mesh.matrixWorld).invert());
+            const halfW = col.width / 2;
+            const isInsideX = (localPos.x >= -halfW && localPos.x <= halfW);
+            let isInsideZ = false;
+            if (col.pivot === 'start') {
+              isInsideZ = (localPos.z >= 0 && localPos.z <= col.length);
+            } else {
+              const halfL = col.length / 2;
+              isInsideZ = (localPos.z >= -halfL && localPos.z <= halfL);
+            }
+            if (isInsideX && isInsideZ) {
+              isIntersecting = true;
+            }
           } else if (col.shape === 'sphere') {
             const dist = enemy.mesh.position.distanceTo(projPos);
             if (dist <= colRadius + enemy.width / 2) {
@@ -401,8 +468,8 @@ export class ActionHelper {
           if (isIntersecting) {
             col.hitTargets.add(enemy.id);
             const kbDir = col.direction ? col.direction.clone() : enemy.mesh.position.clone().sub(projPos);
-            const knockback = kbDir.setY(0).normalize().multiplyScalar(col.knockbackStrength || 3.0);
-            enemy.takeDamage(col.damage, knockback);
+            const knockback = kbDir.setY(0).normalize().multiplyScalar(col.knockbackStrength !== undefined ? col.knockbackStrength : 3.0);
+            this.applyDamageAndEffects(enemy, col, knockback);
           }
         });
       }

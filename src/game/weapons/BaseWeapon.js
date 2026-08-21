@@ -32,6 +32,10 @@ export class BaseWeapon {
     this.reloadTimer = 0;
     this.model = null; // Three.js mesh/group
     this.currentZoomTier = 0; // 0, 1, or 2 for hysteresis zoom steps
+
+    // Initialize bullets from config-driven passive parameters
+    this.maxBullets = this.config.passive?.maxBullets || 100;
+    this.bullets = this.maxBullets;
   }
 
   /**
@@ -83,6 +87,8 @@ export class BaseWeapon {
       const cdMs = actionConfig.cooldown || 0;
       this.cooldowns[actionKey] = cdMs / 1000;
     }
+
+    return success;
   }
 
   // Subclass hooks - return true if action successfully executes (applies cooldown)
@@ -130,7 +136,8 @@ export class BaseWeapon {
 
   updateCoreEnergy(deltaTime) {
     if (this.coreEnergy > 0) {
-      this.coreEnergy = Math.max(0, this.coreEnergy - 15.0 * deltaTime);
+      const decay = this.config.passive?.heatDecayRate || 15.0;
+      this.coreEnergy = Math.max(0, this.coreEnergy - decay * deltaTime);
     }
   }
 
@@ -139,12 +146,27 @@ export class BaseWeapon {
   }
 
   getCoreEnergyStyle() {
-    return {
-      active: false,
-      label: '核心能量',
-      color: '#00f2fe',
-      value: this.coreEnergy
-    };
+    const passive = this.config.passive || {};
+    const label = passive.coreLabel || '核心能量';
+    const suffix = passive.coreSuffix || '';
+    
+    if (suffix === '%') {
+      return {
+        active: true,
+        label: label,
+        color: this.coreEnergy >= 80 ? '#dc3545' : '#00f2fe',
+        value: this.coreEnergy,
+        text: `${Math.round(this.coreEnergy)}${suffix}`
+      };
+    } else {
+      return {
+        active: true,
+        label: label,
+        color: this.id === 'sniper' ? '#ffd700' : '#00f2fe',
+        value: (this.bullets / this.maxBullets) * 100,
+        text: `${this.bullets}/${this.maxBullets}`
+      };
+    }
   }
 
   getHUDData() {

@@ -26,6 +26,9 @@ export class BaseEnemy {
     // Timers
     this.hitFlashTimer = 0.0;
     this.deathTimer = 0.0;
+    
+    // Status Debuffs (e.g. slow, time_slow)
+    this.debuffs = {};
 
     // Mesh & Materials Setup
     this.mesh = new THREE.Group();
@@ -112,13 +115,36 @@ export class BaseEnemy {
     this.mesh.add(this.hpBarGroup);
   }
 
+  applyDebuff(type, value, duration) {
+    if (!this.debuffs[type] || this.debuffs[type].value < value || duration > this.debuffs[type].timer) {
+      this.debuffs[type] = {
+        value: value,
+        timer: duration
+      };
+    }
+  }
+
+  getSpeedMultiplier() {
+    if (this.debuffs['slow'] && this.debuffs['slow'].timer > 0) {
+      return Math.max(0, 1 - this.debuffs['slow'].value);
+    }
+    return 1.0;
+  }
+
+  getLocalTimeScale() {
+    if (this.debuffs['time_slow'] && this.debuffs['time_slow'].timer > 0) {
+      return Math.max(0.1, 1 - this.debuffs['time_slow'].value);
+    }
+    return 1.0;
+  }
+
   /**
    * Unified damage receiver method.
    * @param {number} amount - Damage points
    * @param {THREE.Vector3} [knockbackVector] - Knockback velocity impulse to apply
    */
   takeDamage(amount, knockbackVector) {
-    if (!this.isAlive) return;
+    if (!this.isAlive) return false;
 
     this.hp = Math.max(0, this.hp - amount);
     this.hitFlashTimer = 0.1; // Flash red for 0.1 seconds
@@ -132,7 +158,9 @@ export class BaseEnemy {
     if (this.hp <= 0) {
       this.isAlive = false;
       this.deathTimer = 0.3; // Starts a 0.3s shrink-down animation
+      return true; // KILLED!
     }
+    return false;
   }
 
   /**
@@ -141,9 +169,22 @@ export class BaseEnemy {
    * @param {THREE.Camera} camera - Camera reference to align billboarding HP bars
    */
   update(deltaTime, camera) {
+    // 0. Update debuff timers using raw real-world deltaTime
+    for (const type in this.debuffs) {
+      if (this.debuffs[type].timer > 0) {
+        this.debuffs[type].timer -= deltaTime;
+        if (this.debuffs[type].timer <= 0) {
+          delete this.debuffs[type];
+        }
+      }
+    }
+
+    // Calculate time-dilated delta for animations/physics
+    const localDelta = deltaTime * this.getLocalTimeScale();
+
     // 1. Update visual hit flash timer
     if (this.hitFlashTimer > 0) {
-      this.hitFlashTimer -= deltaTime;
+      this.hitFlashTimer -= localDelta;
       this.material.color.setHex(0xff3333); // Vivid red hit color
       this.material.emissive.setHex(0x550000);
     } else {
@@ -153,10 +194,11 @@ export class BaseEnemy {
 
     // 2. Active lifecycle vs death animation
     if (this.isAlive) {
-      // Apply smooth knockback sliding movement with exponential damping
+      // Apply smooth knockback sliding movement with exponential damping and slow status scaling
       if (this.knockbackVelocity.lengthSq() > 0.001) {
-        this.mesh.position.addScaledVector(this.knockbackVelocity, deltaTime);
-        this.knockbackVelocity.multiplyScalar(Math.exp(-7.0 * deltaTime)); // Quick velocity decay
+        const speedMultiplier = this.getSpeedMultiplier();
+        this.mesh.position.addScaledVector(this.knockbackVelocity, localDelta * speedMultiplier);
+        this.knockbackVelocity.multiplyScalar(Math.exp(-7.0 * localDelta)); // Quick velocity decay
       } else {
         this.knockbackVelocity.set(0, 0, 0);
       }
@@ -185,7 +227,7 @@ export class BaseEnemy {
     } else {
       // Run death shrink animation
       if (this.deathTimer > 0) {
-        this.deathTimer -= deltaTime;
+        this.deathTimer -= localDelta;
         const progress = Math.max(0, this.deathTimer / 0.3);
         this.mesh.scale.set(progress, progress, progress);
       }

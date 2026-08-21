@@ -86,12 +86,11 @@ export class PistolWeapon extends BaseWeapon {
     const { startPoint, direction } = context;
 
     if (context.actionHelper && actionConfig.projectiles) {
-      // 1. Search for a target enemy within angle 30, distance 20-60
-      const targetEnemy = context.actionHelper.findNearestEnemy(startPoint, direction, {
-        fovAngle: 30.0,
-        minDistance: 20.0,
-        maxDistance: 60.0
-      });
+      const grenadeConfig = actionConfig.projectiles[0];
+
+      // 1. Search for a target enemy using parameters from configurations
+      const targetingConfig = grenadeConfig.targeting || { fovAngle: 30.0, minDistance: 20.0, maxDistance: 60.0 };
+      const targetEnemy = context.actionHelper.findNearestEnemy(startPoint, direction, targetingConfig);
 
       // 2. Select target location on the ground (Y = 0)
       const targetLoc = new THREE.Vector3();
@@ -108,7 +107,6 @@ export class PistolWeapon extends BaseWeapon {
       const flyDurationMs = (distance / speed) * 1000;
 
       // 4. Spawn Grenade (Projectile 0)
-      const grenadeConfig = actionConfig.projectiles[0];
       context.actionHelper.spawn({
         ...grenadeConfig,
         position: startPoint.clone(),
@@ -176,12 +174,4 @@ export class PistolWeapon extends BaseWeapon {
     return true;
   }
 
-  getCoreEnergyStyle() {
-    return {
-      active: true,
-      label: '核心溫度',
-      color: this.coreEnergy >= 80 ? '#dc3545' : '#00f2fe',
-      value: this.coreEnergy
-    };
-  }
 }
