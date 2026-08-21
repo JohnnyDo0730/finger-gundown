@@ -275,7 +275,7 @@ export const WeaponConfig = {
         active: true,
         desc: '以極高射速進行全自動連續射擊，每發子彈造成 {damage} 點傷害，射擊冷卻為 {cooldown} 秒。',
         cooldown: 100,
-        damage: 13,
+        damage: 15,
         projectiles: [
           {
             shape: { type: 'sphere', radius: 0.1 },
@@ -357,7 +357,7 @@ export const WeaponConfig = {
           {
             shape: { type: 'sphere', radius: 0.2 },
             motion: { type: 'linear', speed: 65.0 },
-            collision: { type: 'impact', damage: 10, knockbackStrength: 2.0 },
+            collision: { type: 'impact', damage: 15, knockbackStrength: 2.0 },
             duration: 3000,
             color: 0x708090, // slateGray
             opacity: 0.9,
@@ -461,6 +461,7 @@ export const WeaponConfig = {
         chargeTime: 1500,
         animationTime: 1000,
         duration: 5000,
+        ultFireCooldown: 500,   // 大招期間射擊冷卻降低至 0.5s
         lockout: ['slash', 'skill', 'ult'],
         projectiles: [
           {

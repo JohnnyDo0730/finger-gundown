@@ -64,7 +64,7 @@ export class PlayerController {
     this.baseFov = 75;         // Reference FOV for sensitivity scaling
     // ↓ TUNE HERE: minimum sensitivity floor at max zoom (0.0 = full FPS lock, 1.0 = no reduction)
     // At 0.15, sensitivity scales down much more aggressively at high zoom for precision aiming.
-    this.aimSensFloor = 0.15;   // Min ratio of sensitivity retained at max zoom
+    this.aimSensFloor = 0.30;   // Min ratio of sensitivity retained at max zoom
     this.aimHandHistory = [];  // Sliding window queue for hand coordinates to filter jitter
     this.aimHandHistoryMax = 5; // Reduced from 10 to 5 to reduce delay (approx 83ms lag)
     this.aimStartYaw = 0;      // Very initial world yaw when zoom entered, preserved for exit return

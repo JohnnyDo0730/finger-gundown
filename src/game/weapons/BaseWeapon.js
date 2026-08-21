@@ -83,12 +83,19 @@ export class BaseWeapon {
     }
 
     if (success) {
-      // Set cooldown from configuration (convert ms to seconds)
-      const cdMs = actionConfig.cooldown || 0;
-      this.cooldowns[actionKey] = cdMs / 1000;
+      // Set cooldown via virtual method - subclasses can override for conditional logic
+      this.cooldowns[actionKey] = this.getCooldownMs(actionKey) / 1000;
     }
 
     return success;
+  }
+
+  /**
+   * Returns the effective cooldown (ms) for a given action key.
+   * Subclasses can override this to implement per-action conditional cooldown changes.
+   */
+  getCooldownMs(actionKey) {
+    return this.config.hiveActions?.[actionKey]?.cooldown || 0;
   }
 
   // Subclass hooks - return true if action successfully executes (applies cooldown)
