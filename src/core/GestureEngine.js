@@ -248,8 +248,8 @@ export class GestureEngine {
     // 0. Perform Dynamic Lockout Self-Cleaning Check
     if (this.isLockoutActive && timestamp >= this.animationLockEnd) {
       this.isLockoutActive = false;
-      this.emit('ON_LOCKOUT', { 
-        action: this.activeAnimationName, 
+      this.emit('ON_LOCKOUT', {
+        action: this.activeAnimationName,
         active: false,
         suppressedActions: []
       });
@@ -318,10 +318,10 @@ export class GestureEngine {
         let isPinching = false;
         if (indexTip) {
           const distThumbIndex = Math.sqrt(
-            Math.pow(thumbTip.x - indexTip.x, 2) + 
+            Math.pow(thumbTip.x - indexTip.x, 2) +
             Math.pow(thumbTip.y - indexTip.y, 2)
           );
-          
+
           // Anti-misfire check: hand must be open (middle or ring finger extended straight)
           const wrist = rightHand[0];
           const middleTip = rightHand[12];
@@ -597,13 +597,13 @@ export class GestureEngine {
         ratio = Math.max(0, Math.min(1, ratio));
         this.syncAimZoom = ratio; // Zoom represents normalized ratio [0.0, 1.0]
       }
- 
+
       let deltaX = 0, deltaY = 0;
       if (rightHand && rightHand[0] && this.syncAimStartRightWrist) {
         deltaX = rightHand[0].x - this.syncAimStartRightWrist.x;
         deltaY = rightHand[0].y - this.syncAimStartRightWrist.y;
       }
- 
+
       this.emit('ON_SYNC_AIM', { active: true, zoom: this.syncAimZoom, zoomRatio: ratio, deltaX, deltaY });
       return true;
     }
@@ -649,7 +649,7 @@ export class GestureEngine {
           const weaponKey = this.appMode === 'GAMEPLAY' ? this.weaponMode : 'pistol';
           const weapon = WeaponConfig[weaponKey] || {};
           const requiredTime = weapon.hiveActions?.reload?.chargeTime || ActionConfig['right-reload']?.chargeTime || 1000;
-          
+
           if (duration >= requiredTime) {
             this.emit('ON_RELOAD', { duration });
             this.chargeStarts.reload = 0;
@@ -800,7 +800,7 @@ export class GestureEngine {
     // Triangle check: thumbs tips together, index tips together, forming a frame
     const distThumbs = getDistance(leftThumb, rightThumb);
     const distIndices = getDistance(leftIndex, rightIndex);
-    
+
     // Low distances signify triangle points touching
     const isTriangleDetected = distThumbs < 0.07 && distIndices < 0.07;
 

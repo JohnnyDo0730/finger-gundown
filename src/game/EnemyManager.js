@@ -16,7 +16,7 @@ export class EnemyManager {
     this.enemies = [];
 
     // Configuration caps
-    this.minEnemies = 3;
+    this.minEnemies = 5;
     this.maxEnemies = 5;
     this.enemyIdCounter = 0;
 
@@ -41,38 +41,46 @@ export class EnemyManager {
   }
 
   /**
-   * Spawns a single Box/Cylinder target at a safe random distance from the player.
+   * Spawns a single Box/Cylinder target at a safe random distance in front of the player.
    */
   spawnRandomEnemy() {
     const id = `enemy_${this.enemyIdCounter++}_${Math.floor(Math.random() * 1000)}`;
     const type = Math.random() > 0.5 ? 'box' : 'cylinder';
 
     // Query active player position for spawn proximity checks
-    const playerPos = this.gameWorld.playerController
-      ? this.gameWorld.playerController.position
-      : null;
+    const playerController = this.gameWorld.playerController;
+    const playerPos = playerController ? playerController.position : null;
+    const camera = this.gameWorld.camera;
 
-    let x = 0;
-    let z = 0;
-    let attempts = 0;
-    const minPlayerDistance = 15.0; // Prevent spawning right on top of player's face
+    let position;
 
-    do {
-      // Spawns within a closer combat zone directly in front of player (X: -20 to 20, Z: 5 to 25)
-      x = (Math.random() - 0.5) * 40;
-      z = 5 + Math.random() * 20;
-      attempts++;
-    } while (
-      playerPos &&
-      playerPos.distanceTo(new THREE.Vector3(x, playerPos.y, z)) < minPlayerDistance &&
-      attempts < 10
-    );
+    if (playerPos && camera) {
+      // Get player horizontal look direction from camera
+      const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      lookDir.y = 0;
+      lookDir.normalize();
 
-    const position = new THREE.Vector3(x, 0, z);
+      const rightDir = new THREE.Vector3(-lookDir.z, 0, lookDir.x);
+
+      // Random offset in front of player: forward 10 to 25 units, side -10 to 10 units
+      const dForward = 10 + Math.random() * 15;
+      const dSide = (Math.random() - 0.5) * 20;
+
+      position = playerPos.clone()
+        .addScaledVector(lookDir, dForward)
+        .addScaledVector(rightDir, dSide);
+      position.y = 0; // Keep targets pinned to ground plane
+    } else {
+      // Fallback to absolute coordinates if player is not loaded yet
+      const x = (Math.random() - 0.5) * 40;
+      const z = 5 + Math.random() * 20;
+      position = new THREE.Vector3(x, 0, z);
+    }
+
     const enemy = new BaseEnemy(id, type, position, this.gameWorld.scene);
     this.enemies.push(enemy);
 
-    console.log(`[EnemyManager] Spawned ${type} enemy ${id} at (${x.toFixed(1)}, 0, ${z.toFixed(1)})`);
+    console.log(`[EnemyManager] Spawned ${type} enemy ${id} at (${position.x.toFixed(1)}, 0, ${position.z.toFixed(1)})`);
   }
 
   /**
